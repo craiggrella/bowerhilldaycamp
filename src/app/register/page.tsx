@@ -109,8 +109,50 @@ export default function RegisterPage() {
     );
   }
 
-  function handleCheckout() {
-    alert("Stripe checkout coming soon! After payment you'll fill out info for each camper.");
+  async function handleCheckout() {
+    // Create registration (no payment for now)
+    const { data: reg, error: regError } = await supabase
+      .from("registrations")
+      .insert({ amount_cents: totalCents, status: "paid" })
+      .select()
+      .single();
+
+    if (regError || !reg) {
+      alert("Error creating registration. Please try again.");
+      console.error(regError);
+      return;
+    }
+
+    // Create campers + activity choices
+    for (const kid of kids) {
+      const { data: camper, error: camperError } = await supabase
+        .from("campers")
+        .insert({
+          registration_id: reg.id,
+          camp_type_id: kid.campType.id,
+          first_name: kid.name,
+        })
+        .select()
+        .single();
+
+      if (camperError || !camper) {
+        console.error(camperError);
+        continue;
+      }
+
+      // Save activity choices
+      if (kid.activityIds.length > 0) {
+        await supabase.from("camper_activity_choices").insert(
+          kid.activityIds.map((actId) => ({
+            camper_id: camper.id,
+            activity_id: actId,
+          }))
+        );
+      }
+    }
+
+    // Redirect to post-registration info page
+    window.location.href = `/register/info?registration_id=${reg.id}&num_kids=${totalKids}`;
   }
 
   const allKidsReady = kids.every(
@@ -438,10 +480,10 @@ export default function RegisterPage() {
               onClick={handleCheckout}
               className="w-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-white font-bold text-lg py-4 rounded-full transition-colors"
             >
-              Pay ${(totalCents / 100).toFixed(0)} Now
+              Complete Registration
             </button>
             <p className="text-center text-gray-400 text-sm mt-4">
-              After payment, you&apos;ll provide detailed info for each camper.
+              Next, you&apos;ll provide contact and emergency info for your campers.
             </p>
           </div>
         )}

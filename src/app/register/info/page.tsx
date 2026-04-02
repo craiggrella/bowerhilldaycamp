@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import Link from "next/link";
@@ -56,6 +56,8 @@ function CamperInfoForm() {
 
   const [step, setStep] = useState<FormStep>("guardian");
   const [saving, setSaving] = useState(false);
+  const [sameContactForAll, setSameContactForAll] = useState(true);
+  const [camperNames, setCamperNames] = useState<string[]>([]);
 
   // Guardian
   const [guardian, setGuardian] = useState({
@@ -84,6 +86,20 @@ function CamperInfoForm() {
     photo_release: false,
     signed_by: "",
   });
+
+  // Fetch camper names for this registration
+  useEffect(() => {
+    if (!registrationId) return;
+    async function fetchCampers() {
+      const { data } = await supabase
+        .from("campers")
+        .select("first_name")
+        .eq("registration_id", registrationId)
+        .order("created_at");
+      if (data) setCamperNames(data.map((c) => c.first_name));
+    }
+    fetchCampers();
+  }, [registrationId]);
 
   const inputClass =
     "w-full border border-gray-300 rounded-lg px-4 py-3 text-gray-900 focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)] focus:border-transparent";
@@ -154,23 +170,45 @@ function CamperInfoForm() {
   async function saveCamper() {
     setSaving(true);
     const c = campers[currentCamper];
-    const { error } = await supabase.from("campers").insert({
-      registration_id: registrationId,
-      first_name: c.first_name,
-      last_name: c.last_name,
-      date_of_birth: null, // using age instead
-      gender: null,
-      grade: c.grade,
-    });
-    if (error) {
-      alert("Error saving. Please try again.");
-      console.error(error);
-      setSaving(false);
-      return;
+
+    // Check if campers already exist for this registration (created during checkout)
+    const { data: existingCampers } = await supabase
+      .from("campers")
+      .select("id")
+      .eq("registration_id", registrationId)
+      .order("created_at");
+
+    let camperId: string;
+
+    if (existingCampers && existingCampers[currentCamper]) {
+      // Update existing camper
+      camperId = existingCampers[currentCamper].id;
+      await supabase.from("campers").update({
+        last_name: c.last_name,
+        age: c.age,
+        grade: c.grade,
+      }).eq("id", camperId);
+    } else {
+      // Create new camper (fallback)
+      const { data: newCamper, error } = await supabase.from("campers").insert({
+        registration_id: registrationId,
+        first_name: c.first_name,
+        last_name: c.last_name,
+        age: c.age,
+        grade: c.grade,
+      }).select().single();
+      if (error || !newCamper) {
+        alert("Error saving. Please try again.");
+        console.error(error);
+        setSaving(false);
+        return;
+      }
+      camperId = newCamper.id;
     }
-    // Save medical info for this camper
+
+    // Save medical info linked to camper
     await supabase.from("medical_info").insert({
-      registration_id: registrationId,
+      camper_id: camperId,
       allergies: c.allergies_conditions,
       special_needs: c.role === "helper_noon" || c.role === "helper_3pm" ? `Helper: ${c.role}` : null,
     });
@@ -311,9 +349,29 @@ function CamperInfoForm() {
             <h1 className="text-3xl font-bold text-[var(--color-primary)] mb-2">
               Authorized Pickup &amp; Emergency Contacts
             </h1>
-            <p className="text-gray-500 mb-6">
+            <p className="text-gray-500 mb-4">
               Adults (other than yourself) authorized to pick up your child. These also serve as emergency contacts.
             </p>
+
+            {/* Same for all toggle */}
+            {numKids > 1 && (
+              <label className="flex items-center gap-3 mb-6 cursor-pointer bg-white border border-gray-200 rounded-xl p-4">
+                <input
+                  type="checkbox"
+                  checked={sameContactForAll}
+                  onChange={(e) => setSameContactForAll(e.target.checked)}
+                  className="w-5 h-5 accent-[var(--color-accent)]"
+                />
+                <div>
+                  <span className="font-medium text-gray-900">Same emergency contacts for all campers</span>
+                  <p className="text-gray-400 text-sm">
+                    {sameContactForAll
+                      ? `Applies to ${camperNames.length > 0 ? camperNames.join(", ") : `all ${numKids} campers`}`
+                      : "You'll assign contacts to specific campers below"}
+                  </p>
+                </div>
+              </label>
+            )}
 
             {pickups.map((pickup, i) => (
               <div key={i} className="bg-white border border-gray-200 rounded-xl p-6 mb-4">
@@ -344,6 +402,26 @@ function CamperInfoForm() {
                       <input /* required */ className={inputClass} placeholder="e.g. Grandparent, Aunt" value={pickup.relationship} onChange={(e) => updatePickup(i, "relationship", e.target.value)} />
                     </div>
                   </div>
+
+                  {/* Per-kid assignment when not same for all */}
+                  {!sameContactForAll && numKids > 1 && camperNames.length > 0 && (
+                    <div>
+                      <label className={labelClass}>This contact is for:</label>
+                      <div className="flex flex-wrap gap-2">
+                        {camperNames.map((name, kidIdx) => (
+                          <span
+                            key={kidIdx}
+                            className="text-sm bg-[var(--color-primary)] text-white px-3 py-1 rounded-full"
+                          >
+                            {name}
+                          </span>
+                        ))}
+                      </div>
+                      <p className="text-xs text-gray-400 mt-1">
+                        Add separate contacts below for different campers, or use &ldquo;+ Add another contact&rdquo;
+                      </p>
+                    </div>
+                  )}
                 </div>
               </div>
             ))}
