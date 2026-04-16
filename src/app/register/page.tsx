@@ -308,7 +308,7 @@ export default function RegisterPage() {
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -30 }}
             transition={{ duration: 0.3 }}
-            className="max-w-2xl mx-auto px-6 pb-16 w-full"
+            className="max-w-5xl mx-auto px-6 pb-16 w-full"
           >
             <button onClick={() => setStep("count")} className="text-sm text-[var(--color-primary)] mb-4 hover:underline">
               &larr; Back
@@ -319,6 +319,48 @@ export default function RegisterPage() {
             <p className="text-gray-500 mb-8">
               Enter each camper&apos;s name and the last grade they completed.
             </p>
+
+            <div className="grid gap-6 lg:grid-cols-[1fr_320px] items-start">
+
+            <aside className="lg:col-start-2 lg:row-start-1 lg:sticky lg:top-6 bg-white border border-gray-200 rounded-xl p-5 text-sm">
+              <h2 className="font-bold text-[var(--color-primary)] text-lg mb-3">About the camps</h2>
+
+              <div className="mb-4">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-green-100 text-green-700">Jr Day Camp</span>
+                  <span className="font-bold text-gray-900">$25</span>
+                </div>
+                <p className="text-gray-500 text-xs mb-1">9:30 AM – 12:00 PM</p>
+                <p className="text-gray-600">A gentle half-day of crafts, games, songs, and snack for our youngest campers.</p>
+                <p className="text-gray-400 text-xs mt-1"><span className="font-medium text-gray-500">Grades:</span> Preschool, K, 1st, 2nd</p>
+              </div>
+
+              <div className="mb-4">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-orange-100 text-orange-700">Day Camp</span>
+                  <span className="font-bold text-gray-900">$75</span>
+                </div>
+                <p className="text-gray-500 text-xs mb-1">9:30 AM – 3:00 PM</p>
+                <p className="text-gray-600">A full day of camp — morning activities, lunch, plus afternoon programming.</p>
+                <p className="text-gray-400 text-xs mt-1"><span className="font-medium text-gray-500">Grades:</span> 3rd, 4th, 5th</p>
+              </div>
+
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-3">
+                <p className="font-semibold text-amber-900 text-xs mb-1">Morning only option</p>
+                <p className="text-amber-900 text-xs leading-snug">
+                  We know life gets busy, kids have sports and other commitments, and parents with Jr Day and Day Campers might not want to make multiple trips for pickup. That&apos;s why Day Campers can choose to opt out of the afternoon session (12–3pm) and wrap up at the same time as Jr Day Camp. Even though they&apos;re ending early, the price remains the same as normal Day Camp price because we order crafts/supplies for them to complete during the time they are with us.
+                </p>
+              </div>
+
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                <p className="font-semibold text-blue-900 text-xs mb-1">6th grade and up — helpers</p>
+                <p className="text-blue-900 text-xs leading-snug">
+                  Kids who&apos;ve finished 6th grade or beyond join as helpers, supporting staff in a leadership role with our younger campers. That&apos;s why we offer a special helper rate of $25 per camper at 6th grade and up.
+                </p>
+              </div>
+            </aside>
+
+            <div className="lg:col-start-1 lg:row-start-1">
 
             <div className="grid gap-4">
               {campers.map((camper, i) => (
@@ -439,6 +481,9 @@ export default function RegisterPage() {
             >
               Continue to Review
             </button>
+
+            </div>
+            </div>
           </motion.div>
         )}
 

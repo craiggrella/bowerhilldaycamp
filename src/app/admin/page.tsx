@@ -11,6 +11,7 @@ type CamperRow = {
   first_name: string;
   last_name: string | null;
   camp_type_id: string;
+  afternoon_opt_out: boolean;
   registration_id: string;
   created_at: string;
   camp_types: { name: string } | null;
@@ -32,6 +33,7 @@ export default function AdminPage() {
   const [campTypes, setCampTypes] = useState<CampType[]>([]);
   const [loading, setLoading] = useState(true);
   const [campFilter, setCampFilter] = useState("all");
+  const [nameFilter, setNameFilter] = useState("");
 
   useEffect(() => {
     async function load() {
@@ -61,13 +63,32 @@ export default function AdminPage() {
   }
 
   // Stats
-  const dayCampCount = campers.filter((c) => c.camp_types?.name === "Day Camp").length;
+  const dayCampers = campers.filter((c) => c.camp_types?.name === "Day Camp");
+  const dayCampCount = dayCampers.length;
+  const dayCampFull = dayCampers.filter((c) => !c.afternoon_opt_out).length;
+  const dayCampHalf = dayCampers.filter((c) => c.afternoon_opt_out).length;
   const jrCampCount = campers.filter((c) => c.camp_types?.name === "Jr Day Camp").length;
-  const totalRevenue = campers.reduce((sum, c) => sum + (c.registrations?.amount_cents || 0), 0);
+  // Revenue is computed per-registration, not per-camper — dedupe by registration_id
+  // so multi-camper registrations aren't counted multiple times.
+  const seenRegs = new Set<string>();
+  let totalRevenue = 0;
+  for (const c of campers) {
+    if (seenRegs.has(c.registration_id)) continue;
+    seenRegs.add(c.registration_id);
+    totalRevenue += c.registrations?.amount_cents || 0;
+  }
 
-  const filteredCampers = campFilter === "all"
-    ? campers
-    : campers.filter((c) => c.camp_types?.name === campFilter);
+  const nq = nameFilter.trim().toLowerCase();
+  const filteredCampers = campers
+    .filter((c) => (campFilter === "all" ? true : c.camp_types?.name === campFilter))
+    .filter((c) => {
+      if (!nq) return true;
+      const g = guardiansByReg[c.registration_id]?.[0];
+      const haystack = [c.first_name, c.last_name || "", g?.first_name || "", g?.last_name || "", g?.email || "", g?.phone || ""]
+        .join(" ")
+        .toLowerCase();
+      return haystack.includes(nq);
+    });
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -76,21 +97,25 @@ export default function AdminPage() {
       <div className="max-w-6xl mx-auto px-6 py-8">
         {/* Stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-          <div className="bg-white rounded-xl border border-gray-200 p-4 text-center">
+          <div className="bg-white rounded-xl border border-gray-200 p-4 text-center flex flex-col justify-center min-h-[140px]">
             <div className="text-3xl font-black text-[var(--color-primary)]">{campers.length}</div>
             <div className="text-sm text-gray-400">Total Campers</div>
           </div>
-          <div className="bg-white rounded-xl border border-gray-200 p-4 text-center">
+          <div className="bg-white rounded-xl border border-gray-200 p-4 text-center flex flex-col justify-center min-h-[140px]">
             <div className="text-3xl font-black text-orange-500">{dayCampCount}</div>
             <div className="text-sm text-gray-400">Day Camp</div>
+            <div className="text-xs text-gray-500 mt-2 leading-snug">
+              <div>{dayCampFull} Full Day</div>
+              <div>{dayCampHalf} Morning Only</div>
+            </div>
           </div>
-          <div className="bg-white rounded-xl border border-gray-200 p-4 text-center">
+          <div className="bg-white rounded-xl border border-gray-200 p-4 text-center flex flex-col justify-center min-h-[140px]">
             <div className="text-3xl font-black text-green-500">{jrCampCount}</div>
             <div className="text-sm text-gray-400">Jr Day Camp</div>
           </div>
-          <div className="bg-white rounded-xl border border-gray-200 p-4 text-center">
+          <div className="bg-white rounded-xl border border-gray-200 p-4 text-center flex flex-col justify-center min-h-[140px]">
             <div className="text-3xl font-black text-[var(--color-accent)]">
-              ${(totalRevenue / 100).toFixed(0) || "0"}
+              ${(totalRevenue / 100).toLocaleString("en-US", { maximumFractionDigits: 0 })}
             </div>
             <div className="text-sm text-gray-400">Revenue</div>
           </div>
@@ -118,20 +143,29 @@ export default function AdminPage() {
 
         {!loading && (
           <div>
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
               <h3 className="text-lg font-bold text-gray-900">
                 Campers ({filteredCampers.length})
               </h3>
-              <select
-                className="border border-gray-300 rounded-lg px-3 py-2 text-sm"
-                value={campFilter}
-                onChange={(e) => setCampFilter(e.target.value)}
-              >
-                <option value="all">All Camps</option>
-                {campTypes.map((ct) => (
-                  <option key={ct.id} value={ct.name}>{ct.name}</option>
-                ))}
-              </select>
+              <div className="flex items-center gap-3 flex-1 justify-end">
+                <input
+                  type="search"
+                  placeholder="Search by camper or parent name, email, phone…"
+                  value={nameFilter}
+                  onChange={(e) => setNameFilter(e.target.value)}
+                  className="flex-1 max-w-md border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)] focus:border-transparent"
+                />
+                <select
+                  className="border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                  value={campFilter}
+                  onChange={(e) => setCampFilter(e.target.value)}
+                >
+                  <option value="all">All Camps</option>
+                  {campTypes.map((ct) => (
+                    <option key={ct.id} value={ct.name}>{ct.name}</option>
+                  ))}
+                </select>
+              </div>
             </div>
 
             {filteredCampers.length === 0 ? (
@@ -144,10 +178,17 @@ export default function AdminPage() {
                     <div key={c.id} className="bg-white rounded-xl border border-gray-200 p-5">
                       <div className="flex items-start justify-between mb-2">
                         <div>
-                          <h3 className="font-bold text-gray-900 text-lg">
-                            {c.first_name} {c.last_name || ""}
-                          </h3>
-                          <div className="flex items-center gap-2 mt-1">
+                          <div className="flex items-baseline gap-4">
+                            <div>
+                              <div className="text-[10px] uppercase tracking-wide text-gray-400 font-medium">First Name</div>
+                              <div className="font-bold text-gray-900 text-lg leading-tight">{c.first_name}</div>
+                            </div>
+                            <div>
+                              <div className="text-[10px] uppercase tracking-wide text-gray-400 font-medium">Last Name</div>
+                              <div className="font-bold text-gray-900 text-lg leading-tight">{c.last_name || "—"}</div>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 mt-2">
                             <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
                               c.camp_types?.name === "Day Camp"
                                 ? "bg-orange-100 text-orange-700"

@@ -65,11 +65,36 @@ type RawMedical = {
   special_needs: string | null;
 };
 
+type SortField =
+  | "first_name"
+  | "last_name"
+  | "grade"
+  | "camp_type_name"
+  | "guardian_name";
+type SortDir = "asc" | "desc";
+
 export default function RosterPage() {
   const router = useRouter();
   const [roster, setRoster] = useState<RosterEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [campFilter, setCampFilter] = useState("all");
+  const [query, setQuery] = useState("");
+  const [sortField, setSortField] = useState<SortField>("last_name");
+  const [sortDir, setSortDir] = useState<SortDir>("asc");
+
+  function toggleSort(field: SortField) {
+    if (sortField === field) {
+      setSortDir(sortDir === "asc" ? "desc" : "asc");
+    } else {
+      setSortField(field);
+      setSortDir("asc");
+    }
+  }
+
+  function sortArrow(field: SortField) {
+    if (sortField !== field) return <span className="text-gray-300 ml-1">⇅</span>;
+    return <span className="ml-1">{sortDir === "asc" ? "▲" : "▼"}</span>;
+  }
 
   useEffect(() => {
     async function load() {
@@ -141,9 +166,57 @@ export default function RosterPage() {
     load();
   }, [router]);
 
-  const filtered = campFilter === "all"
-    ? roster
-    : roster.filter((r) => r.camp_type_name === campFilter);
+  // Flatten each row into a single searchable string for omnibox matching.
+  function rowHaystack(r: RosterEntry): string {
+    const contacts = r.emergency_contacts
+      .map((ec) => `${ec.first_name} ${ec.last_name} ${ec.phone} ${ec.relationship}`)
+      .join(" ");
+    return [
+      r.first_name,
+      r.last_name || "",
+      r.grade || "",
+      r.camp_type_name,
+      r.afternoon_opt_out ? "morning only" : "full day",
+      r.guardian_name,
+      r.guardian_phone,
+      r.guardian_email,
+      contacts,
+      r.allergies,
+      r.medical_notes,
+    ].join(" ").toLowerCase();
+  }
+
+  function campFilterMatches(r: RosterEntry, filter: string): boolean {
+    if (filter === "all") return true;
+    if (filter === "Day Camp — Full Day") return r.camp_type_name === "Day Camp" && !r.afternoon_opt_out;
+    if (filter === "Day Camp — Morning Only") return r.camp_type_name === "Day Camp" && r.afternoon_opt_out;
+    return r.camp_type_name === filter;
+  }
+
+  // When sorting by Camp, use a composite key so all Day Camp Full Day rows
+  // cluster together and all Day Camp Morning Only rows cluster together.
+  function sortKey(r: RosterEntry, field: SortField): string {
+    if (field === "camp_type_name") {
+      if (r.camp_type_name === "Day Camp") {
+        return r.afternoon_opt_out ? "Day Camp 2 Morning" : "Day Camp 1 Full";
+      }
+      return r.camp_type_name;
+    }
+    return (r[field] || "").toString();
+  }
+
+  const q = query.trim().toLowerCase();
+  const filtered = roster
+    .filter((r) => campFilterMatches(r, campFilter))
+    .filter((r) => (q ? rowHaystack(r).includes(q) : true))
+    .slice() // don't mutate state
+    .sort((a, b) => {
+      const av = sortKey(a, sortField).toLowerCase();
+      const bv = sortKey(b, sortField).toLowerCase();
+      if (av < bv) return sortDir === "asc" ? -1 : 1;
+      if (av > bv) return sortDir === "asc" ? 1 : -1;
+      return 0;
+    });
 
   return (
     <div className="min-h-screen bg-white">
@@ -152,7 +225,7 @@ export default function RosterPage() {
       </div>
 
       <div className="max-w-[1200px] mx-auto px-6 py-8">
-        <div className="print:hidden flex items-center justify-between mb-6">
+        <div className="print:hidden flex items-center justify-between mb-4">
           <h1 className="text-2xl font-bold text-[var(--color-primary)]">
             Camp Roster ({filtered.length} campers)
           </h1>
@@ -163,9 +236,17 @@ export default function RosterPage() {
               onChange={(e) => setCampFilter(e.target.value)}
             >
               <option value="all">All Camps</option>
-              <option value="Day Camp">Day Camp</option>
+              <option value="Day Camp">Day Camp (all)</option>
+              <option value="Day Camp — Full Day">Day Camp — Full Day</option>
+              <option value="Day Camp — Morning Only">Day Camp — Morning Only</option>
               <option value="Jr Day Camp">Jr Day Camp</option>
             </select>
+            <a
+              href="/api/admin/roster/export"
+              className="bg-emerald-600 text-white font-bold text-sm px-5 py-2 rounded-lg hover:bg-emerald-700 transition-colors"
+            >
+              Export to Excel
+            </a>
             <button
               onClick={() => window.print()}
               className="bg-[var(--color-primary)] text-white font-bold text-sm px-5 py-2 rounded-lg hover:bg-[var(--color-primary-light)] transition-colors"
@@ -173,6 +254,25 @@ export default function RosterPage() {
               Print Roster
             </button>
           </div>
+        </div>
+
+        {/* Omnibox filter — searches across every field in the table */}
+        <div className="print:hidden mb-4 flex items-center gap-3">
+          <input
+            type="search"
+            placeholder="Search anything in the roster — name, grade, camp, phone, allergy…"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            className="flex-1 border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)] focus:border-transparent"
+          />
+          {query && (
+            <button
+              onClick={() => setQuery("")}
+              className="text-sm text-gray-500 hover:text-gray-700"
+            >
+              Clear
+            </button>
+          )}
         </div>
 
         <div className="hidden print:block mb-4">
@@ -189,10 +289,36 @@ export default function RosterPage() {
             <table className="w-full text-sm border-collapse">
               <thead>
                 <tr className="border-b-2 border-gray-300">
-                  <th className="text-left py-3 px-2 font-bold text-gray-700">Camper</th>
-                  <th className="text-left py-3 px-2 font-bold text-gray-700">Grade</th>
-                  <th className="text-left py-3 px-2 font-bold text-gray-700">Camp</th>
-                  <th className="text-left py-3 px-2 font-bold text-gray-700">Guardian</th>
+                  <th
+                    onClick={() => toggleSort("first_name")}
+                    className="text-left py-3 px-2 font-bold text-gray-700 cursor-pointer select-none hover:text-[var(--color-primary)] print:cursor-auto print:hover:text-gray-700"
+                  >
+                    First Name{sortArrow("first_name")}
+                  </th>
+                  <th
+                    onClick={() => toggleSort("last_name")}
+                    className="text-left py-3 px-2 font-bold text-gray-700 cursor-pointer select-none hover:text-[var(--color-primary)] print:cursor-auto print:hover:text-gray-700"
+                  >
+                    Last Name{sortArrow("last_name")}
+                  </th>
+                  <th
+                    onClick={() => toggleSort("grade")}
+                    className="text-left py-3 px-2 font-bold text-gray-700 cursor-pointer select-none hover:text-[var(--color-primary)] print:cursor-auto print:hover:text-gray-700"
+                  >
+                    Grade{sortArrow("grade")}
+                  </th>
+                  <th
+                    onClick={() => toggleSort("camp_type_name")}
+                    className="text-left py-3 px-2 font-bold text-gray-700 cursor-pointer select-none hover:text-[var(--color-primary)] print:cursor-auto print:hover:text-gray-700"
+                  >
+                    Camp{sortArrow("camp_type_name")}
+                  </th>
+                  <th
+                    onClick={() => toggleSort("guardian_name")}
+                    className="text-left py-3 px-2 font-bold text-gray-700 cursor-pointer select-none hover:text-[var(--color-primary)] print:cursor-auto print:hover:text-gray-700"
+                  >
+                    Guardian{sortArrow("guardian_name")}
+                  </th>
                   <th className="text-left py-3 px-2 font-bold text-gray-700">Emergency Contacts</th>
                   <th className="text-left py-3 px-2 font-bold text-gray-700">Medical / Allergies</th>
                 </tr>
@@ -200,9 +326,8 @@ export default function RosterPage() {
               <tbody>
                 {filtered.map((r) => (
                   <tr key={r.id} className="border-b border-gray-200 hover:bg-gray-50 print:hover:bg-white">
-                    <td className="py-3 px-2 font-medium">
-                      {r.first_name} {r.last_name || ""}
-                    </td>
+                    <td className="py-3 px-2 font-medium">{r.first_name}</td>
+                    <td className="py-3 px-2 font-medium">{r.last_name || ""}</td>
                     <td className="py-3 px-2 text-gray-600">{r.grade || "—"}</td>
                     <td className="py-3 px-2">
                       <div className="flex flex-wrap items-center gap-1">
@@ -213,10 +338,16 @@ export default function RosterPage() {
                         }`}>
                           {r.camp_type_name}
                         </span>
-                        {r.afternoon_opt_out && (
-                          <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 print:px-0 print:bg-transparent print:text-amber-700">
-                            Morning only
-                          </span>
+                        {r.camp_type_name === "Day Camp" && (
+                          r.afternoon_opt_out ? (
+                            <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 print:px-0 print:bg-transparent print:text-amber-700">
+                              Morning only
+                            </span>
+                          ) : (
+                            <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 print:px-0 print:bg-transparent print:text-blue-700">
+                              Full day
+                            </span>
+                          )
                         )}
                       </div>
                     </td>
