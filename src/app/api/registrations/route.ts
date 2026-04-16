@@ -13,6 +13,7 @@ type Body = {
   amountCents: number;
   stripePaymentId: string;
   stripeStatus: string;
+  contactEmail?: string; // from LinkAuthenticationElement; will be used for the receipt email once that feature lands
   campers: CamperPayload[];
 };
 

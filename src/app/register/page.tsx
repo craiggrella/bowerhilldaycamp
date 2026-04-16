@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import Header from "@/components/Header";
 import { motion, AnimatePresence } from "framer-motion";
 import { loadStripe } from "@stripe/stripe-js";
-import { Elements, PaymentElement, useStripe, useElements } from "@stripe/react-stripe-js";
+import { Elements, PaymentElement, LinkAuthenticationElement, useStripe, useElements } from "@stripe/react-stripe-js";
 
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
 
@@ -158,7 +158,7 @@ export default function RegisterPage() {
 
   // ─── Checkout ────────────────────────────────────────
 
-  async function handleCheckout(stripePaymentId: string, stripeStatus: string) {
+  async function handleCheckout(stripePaymentId: string, stripeStatus: string, contactEmail: string) {
     try {
       const res = await fetch("/api/registrations", {
         method: "POST",
@@ -167,6 +167,7 @@ export default function RegisterPage() {
           amountCents: totalCents,
           stripePaymentId,
           stripeStatus,
+          contactEmail,
           campers: campers.map((c) => ({
             campTypeId: c.campType?.id ?? null,
             firstName: c.firstName,
@@ -323,37 +324,48 @@ export default function RegisterPage() {
             <div className="grid gap-6 lg:grid-cols-[1fr_320px] items-start">
 
             <aside className="lg:col-start-2 lg:row-start-1 lg:sticky lg:top-6 bg-white border border-gray-200 rounded-xl p-5 text-sm">
-              <h2 className="font-bold text-[var(--color-primary)] text-lg mb-3">About the camps</h2>
+              <h2 className="font-bold text-[var(--color-primary)] text-lg mb-5">About the camps</h2>
 
-              <div className="mb-4">
-                <div className="flex items-center gap-2 mb-1">
+              <div className="mb-6">
+                <div className="flex items-center gap-2 mb-2">
                   <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-green-100 text-green-700">Jr Day Camp</span>
                   <span className="font-bold text-gray-900">$25</span>
                 </div>
-                <p className="text-gray-500 text-xs mb-1">9:30 AM – 12:00 PM</p>
+                <p className="text-gray-500 text-xs mb-2">9:30 AM – 12:00 PM</p>
                 <p className="text-gray-600">A gentle half-day of crafts, games, songs, and snack for our youngest campers.</p>
-                <p className="text-gray-400 text-xs mt-1"><span className="font-medium text-gray-500">Grades:</span> Preschool, K, 1st, 2nd</p>
+                <p className="text-gray-400 text-xs mt-2"><span className="font-medium text-gray-500">Grades:</span> Preschool, K, 1st, 2nd</p>
               </div>
 
-              <div className="mb-4">
-                <div className="flex items-center gap-2 mb-1">
+              <div className="mb-6">
+                <div className="flex items-center gap-2 mb-2">
                   <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-orange-100 text-orange-700">Day Camp</span>
                   <span className="font-bold text-gray-900">$75</span>
                 </div>
-                <p className="text-gray-500 text-xs mb-1">9:30 AM – 3:00 PM</p>
+                <p className="text-gray-500 text-xs mb-2">9:30 AM – 3:00 PM</p>
                 <p className="text-gray-600">A full day of camp — morning activities, lunch, plus afternoon programming.</p>
-                <p className="text-gray-400 text-xs mt-1"><span className="font-medium text-gray-500">Grades:</span> 3rd, 4th, 5th</p>
+                <p className="text-gray-400 text-xs mt-2"><span className="font-medium text-gray-500">Grades:</span> 3rd, 4th, 5th</p>
               </div>
 
-              <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-3">
-                <p className="font-semibold text-amber-900 text-xs mb-1">Morning only option</p>
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-6">
+                <p className="font-semibold text-amber-900 text-xs mb-2">Morning only option</p>
                 <p className="text-amber-900 text-xs leading-snug">
                   We know life gets busy, kids have sports and other commitments, and parents with Jr Day and Day Campers might not want to make multiple trips for pickup. That&apos;s why Day Campers can choose to opt out of the afternoon session (12–3pm) and wrap up at the same time as Jr Day Camp. Even though they&apos;re ending early, the price remains the same as normal Day Camp price because we order crafts/supplies for them to complete during the time they are with us.
                 </p>
               </div>
 
+              <div className="mb-6">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-orange-100 text-orange-700">Day Camp</span>
+                  <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">Helper</span>
+                  <span className="font-bold text-gray-900">$25</span>
+                </div>
+                <p className="text-gray-500 text-xs mb-2">9:30 AM – 3:00 PM</p>
+                <p className="text-gray-600">Helper rate for campers who&apos;ve completed 6th grade or higher.</p>
+                <p className="text-gray-400 text-xs mt-2"><span className="font-medium text-gray-500">Grades:</span> 6th and up</p>
+              </div>
+
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                <p className="font-semibold text-blue-900 text-xs mb-1">6th grade and up — helpers</p>
+                <p className="font-semibold text-blue-900 text-xs mb-2">6th grade and up — helpers</p>
                 <p className="text-blue-900 text-xs leading-snug">
                   Kids who&apos;ve finished 6th grade or beyond join as helpers, supporting staff in a leadership role with our younger campers. That&apos;s why we offer a special helper rate of $25 per camper at 6th grade and up.
                 </p>
@@ -637,7 +649,7 @@ function PaymentStep({
   onSuccess,
 }: {
   amountCents: number;
-  onSuccess: (paymentIntentId: string, status: string) => void;
+  onSuccess: (paymentIntentId: string, status: string, email: string) => void;
 }) {
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -679,19 +691,32 @@ function PaymentStep({
   );
 }
 
-function PaymentForm({ onSuccess }: { onSuccess: (paymentIntentId: string, status: string) => void }) {
+function PaymentForm({ onSuccess }: { onSuccess: (paymentIntentId: string, status: string, email: string) => void }) {
   const stripe = useStripe();
   const elements = useElements();
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [email, setEmail] = useState("");
+  const [name, setName] = useState("");
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!stripe || !elements) return;
+    if (!email.trim()) {
+      setError("Please enter an email address.");
+      return;
+    }
+    if (!name.trim()) {
+      setError("Please enter the name on the card.");
+      return;
+    }
     setSubmitting(true);
     setError(null);
     const { error: stripeError, paymentIntent } = await stripe.confirmPayment({
       elements,
+      confirmParams: {
+        payment_method_data: { billing_details: { email, name: name.trim() } },
+      },
       redirect: "if_required",
     });
     if (stripeError) {
@@ -700,7 +725,7 @@ function PaymentForm({ onSuccess }: { onSuccess: (paymentIntentId: string, statu
       return;
     }
     if (paymentIntent?.status === "succeeded") {
-      onSuccess(paymentIntent.id, paymentIntent.status);
+      onSuccess(paymentIntent.id, paymentIntent.status, email);
       return;
     }
     setError(`Unexpected payment status: ${paymentIntent?.status ?? "unknown"}`);
@@ -709,6 +734,23 @@ function PaymentForm({ onSuccess }: { onSuccess: (paymentIntentId: string, statu
 
   return (
     <form onSubmit={handleSubmit} className="grid gap-4">
+      <div className="bg-white border border-gray-200 rounded-xl p-5 grid gap-3">
+        <LinkAuthenticationElement
+          onChange={(e) => setEmail(e.value.email)}
+        />
+        <div>
+          <label className="block text-xs font-medium text-gray-600 mb-1">Name</label>
+          <input
+            type="text"
+            autoComplete="cc-name"
+            placeholder="Full name"
+            className="w-full border border-gray-300 rounded-md px-3 py-2.5 text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)] focus:border-transparent"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            required
+          />
+        </div>
+      </div>
       <div className="bg-white border border-gray-200 rounded-xl p-5">
         <PaymentElement
           options={{
