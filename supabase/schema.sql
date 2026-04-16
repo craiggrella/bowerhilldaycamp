@@ -39,6 +39,7 @@ create table campers (
   age text,
   grade text,
   role text,
+  afternoon_opt_out boolean not null default false,
   created_at timestamptz default now()
 );
 
@@ -106,11 +107,20 @@ create table consents (
   created_at timestamptz default now()
 );
 
+-- Junction: which emergency contacts belong to which campers
+create table camper_emergency_contacts (
+  id uuid primary key default gen_random_uuid(),
+  camper_id uuid references campers(id) on delete cascade,
+  emergency_contact_id uuid references emergency_contacts(id) on delete cascade,
+  created_at timestamptz default now(),
+  unique(camper_id, emergency_contact_id)
+);
+
 -- ============ SEED DATA ============
 
 insert into camp_types (name, description, schedule, price_cents, capacity) values
-  ('Day Camp', 'Full day camp experience for kids', 'Full Day', 5000, 50),
-  ('Jr Day Camp', 'Half day camp for younger children', 'Half Day', 3500, 30);
+  ('Day Camp', 'Full day camp experience for kids', '9:30 AM – 3:00 PM', 7500, 50),
+  ('Jr Day Camp', 'Half day camp for younger children', '9:30 AM – 12:00 PM', 2500, 30);
 
 insert into activities (name, description, type, capacity) values
   ('Arts & Crafts', 'Painting, drawing, sculpting, and hands-on creative projects kids can take home', 'Creative', 20),
