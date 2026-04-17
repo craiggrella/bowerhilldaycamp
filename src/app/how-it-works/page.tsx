@@ -13,10 +13,10 @@ const steps = [
   {
     number: "2",
     color: "#4CAF50",
-    emoji: "🎨",
-    title: "Choose Your Activity Tracts",
+    emoji: "🕒",
+    title: "Flexible Options",
     description:
-      "Select from awesome activity tracts throughout the day — arts & crafts, sports, music, nature, and more. Make it your own!",
+      "We know life gets busy, kids have sports and other commitments, and parents with Jr Day and Day Campers might not want to make multiple trips for pickup. That's why Day Campers can choose to opt out of the afternoon session (12–3pm) and wrap up at the same time as Jr Day Camp.",
   },
   {
     number: "3",
@@ -25,6 +25,14 @@ const steps = [
     title: "Contact & Emergency Info",
     description:
       "Fill out the important stuff — parent info, emergency contacts, medical details, and waivers. We keep your kids safe!",
+  },
+  {
+    number: "4",
+    color: "#1E88E5",
+    emoji: "📬",
+    title: "Check Your Inbox",
+    description:
+      "You'll get 2 receipts — one for your payment, and one with all the details: where to go, when to drop off, and a recap of all the info you submitted.",
   },
 ];
 
