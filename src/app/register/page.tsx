@@ -434,6 +434,11 @@ export default function RegisterPage() {
                         }`}>
                           {camper.campType.name}
                         </span>
+                        {camper.grade === "6th and up" && (
+                          <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 ml-1">
+                            Helper
+                          </span>
+                        )}
                         <span className="text-gray-400 text-sm ml-2">
                           {getSchedule(camper.campType.name, camper.afternoonOptOut)}
                         </span>
@@ -532,6 +537,11 @@ export default function RegisterPage() {
                     }`}>
                       {c.campType?.name}
                     </span>
+                    {c.grade === "6th and up" && (
+                      <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">
+                        Helper
+                      </span>
+                    )}
                     <span className="text-gray-400 text-xs">Grade: {c.grade}</span>
                     <span className="text-gray-400 text-xs">&bull; {getSchedule(c.campType!.name, c.afternoonOptOut)}</span>
                   </div>
@@ -610,13 +620,18 @@ export default function RegisterPage() {
             <div className="grid gap-4 mb-8">
               {campers.map((c, i) => (
                 <div key={i} className="bg-white border border-gray-200 rounded-xl p-5">
-                  <div className="flex items-center gap-2 mb-2">
+                  <div className="flex flex-wrap items-center gap-2 mb-2">
                     <span className="font-bold text-gray-900">{c.firstName} {c.lastName}</span>
                     <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
                       c.campType?.name === "Day Camp" ? "bg-orange-100 text-orange-700" : "bg-green-100 text-green-700"
                     }`}>
                       {c.campType?.name}
                     </span>
+                    {c.grade === "6th and up" && (
+                      <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">
+                        Helper
+                      </span>
+                    )}
                   </div>
                   <p className="text-sm text-gray-500">{getSchedule(c.campType!.name, c.afternoonOptOut)}</p>
                 </div>

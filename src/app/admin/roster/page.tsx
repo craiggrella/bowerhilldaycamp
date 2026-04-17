@@ -188,8 +188,8 @@ export default function RosterPage() {
 
   function campFilterMatches(r: RosterEntry, filter: string): boolean {
     if (filter === "all") return true;
-    if (filter === "Day Camp — Full Day") return r.camp_type_name === "Day Camp" && !r.afternoon_opt_out;
     if (filter === "Day Camp — Morning Only") return r.camp_type_name === "Day Camp" && r.afternoon_opt_out;
+    if (filter === "Day Camp — Helpers") return r.camp_type_name === "Day Camp" && r.grade === "6th and up";
     return r.camp_type_name === filter;
   }
 
@@ -237,8 +237,8 @@ export default function RosterPage() {
             >
               <option value="all">All Camps</option>
               <option value="Day Camp">Day Camp (all)</option>
-              <option value="Day Camp — Full Day">Day Camp — Full Day</option>
               <option value="Day Camp — Morning Only">Day Camp — Morning Only</option>
+              <option value="Day Camp — Helpers">Day Camp — Helpers</option>
               <option value="Jr Day Camp">Jr Day Camp</option>
             </select>
             <a
@@ -338,16 +338,15 @@ export default function RosterPage() {
                         }`}>
                           {r.camp_type_name}
                         </span>
-                        {r.camp_type_name === "Day Camp" && (
-                          r.afternoon_opt_out ? (
-                            <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 print:px-0 print:bg-transparent print:text-amber-700">
-                              Morning only
-                            </span>
-                          ) : (
-                            <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 print:px-0 print:bg-transparent print:text-blue-700">
-                              Full day
-                            </span>
-                          )
+                        {r.grade === "6th and up" && (
+                          <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 print:px-0 print:bg-transparent print:text-blue-700">
+                            Helper
+                          </span>
+                        )}
+                        {r.afternoon_opt_out && (
+                          <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 print:px-0 print:bg-transparent print:text-amber-700">
+                            Morning only
+                          </span>
                         )}
                       </div>
                     </td>

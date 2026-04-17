@@ -11,6 +11,7 @@ type CamperRow = {
   first_name: string;
   last_name: string | null;
   camp_type_id: string;
+  grade: string | null;
   afternoon_opt_out: boolean;
   registration_id: string;
   created_at: string;
@@ -65,7 +66,6 @@ export default function AdminPage() {
   // Stats
   const dayCampers = campers.filter((c) => c.camp_types?.name === "Day Camp");
   const dayCampCount = dayCampers.length;
-  const dayCampFull = dayCampers.filter((c) => !c.afternoon_opt_out).length;
   const dayCampHalf = dayCampers.filter((c) => c.afternoon_opt_out).length;
   const jrCampCount = campers.filter((c) => c.camp_types?.name === "Jr Day Camp").length;
   // Revenue is computed per-registration, not per-camper — dedupe by registration_id
@@ -105,7 +105,6 @@ export default function AdminPage() {
             <div className="text-3xl font-black text-orange-500">{dayCampCount}</div>
             <div className="text-sm text-gray-400">Day Camp</div>
             <div className="text-xs text-gray-500 mt-2 leading-snug">
-              <div>{dayCampFull} Full Day</div>
               <div>{dayCampHalf} Morning Only</div>
             </div>
           </div>
@@ -188,7 +187,7 @@ export default function AdminPage() {
                               <div className="font-bold text-gray-900 text-lg leading-tight">{c.last_name || "—"}</div>
                             </div>
                           </div>
-                          <div className="flex items-center gap-2 mt-2">
+                          <div className="flex flex-wrap items-center gap-2 mt-2">
                             <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
                               c.camp_types?.name === "Day Camp"
                                 ? "bg-orange-100 text-orange-700"
@@ -196,6 +195,16 @@ export default function AdminPage() {
                             }`}>
                               {c.camp_types?.name}
                             </span>
+                            {c.grade === "6th and up" && (
+                              <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">
+                                Helper
+                              </span>
+                            )}
+                            {c.afternoon_opt_out && (
+                              <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">
+                                Morning only
+                              </span>
+                            )}
                             <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
                               c.registrations?.status === "paid"
                                 ? "bg-emerald-100 text-emerald-700"

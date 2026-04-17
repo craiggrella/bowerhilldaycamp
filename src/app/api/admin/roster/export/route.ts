@@ -139,12 +139,13 @@ export async function GET() {
       .join("; ");
 
     const medical = [med?.allergies, med?.notes].filter(Boolean).join("; ");
+    const campLabel = c.grade === "6th and up" ? `${campName || ""} — Helper` : (campName || "");
 
     return [
       c.first_name || "",
       c.last_name || "",
       c.grade || "",
-      campName || "",
+      campLabel,
       scheduleFor(campName || "", c.afternoon_opt_out),
       g ? `${g.first_name} ${g.last_name}` : "",
       g?.phone || "",

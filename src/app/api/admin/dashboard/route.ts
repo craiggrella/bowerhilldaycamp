@@ -10,7 +10,7 @@ export async function GET() {
     supabaseAdmin
       .from("campers")
       .select(`
-        id, first_name, last_name, camp_type_id, afternoon_opt_out, registration_id, created_at,
+        id, first_name, last_name, camp_type_id, grade, afternoon_opt_out, registration_id, created_at,
         camp_types (name),
         registrations (status, amount_cents, stripe_payment_id, created_at)
       `)
