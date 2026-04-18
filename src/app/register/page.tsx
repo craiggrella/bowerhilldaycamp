@@ -110,6 +110,31 @@ function getSchedule(campName: string, optOut: boolean): string {
   return "9:30 AM – 3:00 PM";
 }
 
+// ─── Format helpers ───────────────────────────────────────
+
+// Keep only digits, cap at 10, format as xxx-xxx-xxxx as the user types.
+function formatPhone(input: string): string {
+  const digits = input.replace(/\D/g, "").slice(0, 10);
+  if (digits.length <= 3) return digits;
+  if (digits.length <= 6) return `${digits.slice(0, 3)}-${digits.slice(3)}`;
+  return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`;
+}
+
+function formatState(input: string): string {
+  return input.toUpperCase().replace(/[^A-Z]/g, "").slice(0, 2);
+}
+
+function formatZip(input: string): string {
+  return input.replace(/\D/g, "").slice(0, 5);
+}
+
+// Simple email format check — not RFC-complete, but catches obvious mistakes
+// while staying consistent with browser HTML5 validation.
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const PHONE_RE = /^\d{3}-\d{3}-\d{4}$/;
+const STATE_RE = /^[A-Z]{2}$/;
+const ZIP_RE = /^\d{5}$/;
+
 // ─── Component ───────────────────────────────────────────
 
 export default function RegisterPage() {
@@ -331,10 +356,17 @@ export default function RegisterPage() {
     return true;
   });
 
-  const guardianReady =
-    guardian.first_name.trim() && guardian.last_name.trim() && guardian.email.trim() && guardian.phone.trim();
+  const guardianReady = Boolean(
+    guardian.first_name.trim() &&
+      guardian.last_name.trim() &&
+      EMAIL_RE.test(guardian.email.trim()) &&
+      PHONE_RE.test(guardian.phone.trim()) &&
+      // state/zip optional, but if filled must be valid format
+      (!guardian.state || STATE_RE.test(guardian.state)) &&
+      (!guardian.zip || ZIP_RE.test(guardian.zip))
+  );
 
-  const validPickups = pickups.filter((p) => p.name.trim() && p.phone.trim() && p.relationship.trim());
+  const validPickups = pickups.filter((p) => p.name.trim() && PHONE_RE.test(p.phone.trim()) && p.relationship.trim());
   const coveredCamperIndexes = new Set<number>(
     sameContactForAll
       ? campers.map((_, i) => i)
@@ -542,8 +574,11 @@ export default function RegisterPage() {
 
                   <div className="grid grid-cols-2 gap-4 mb-4">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">First Name</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor={`c-first-${i}`}>First Name</label>
                       <input
+                        id={`c-first-${i}`}
+                        autoComplete="off"
+                        autoCapitalize="words"
                         className={inputClass}
                         placeholder="First name"
                         value={camper.firstName}
@@ -551,8 +586,11 @@ export default function RegisterPage() {
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Last Name</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor={`c-last-${i}`}>Last Name</label>
                       <input
+                        id={`c-last-${i}`}
+                        autoComplete="off"
+                        autoCapitalize="words"
                         className={inputClass}
                         placeholder="Last name"
                         value={camper.lastName}
@@ -723,40 +761,117 @@ export default function RegisterPage() {
             >
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className={labelClass}>First Name *</label>
-                  <input required className={inputClass} value={guardian.first_name} onChange={(e) => setGuardian({ ...guardian, first_name: e.target.value })} />
+                  <label className={labelClass} htmlFor="g-first">First Name *</label>
+                  <input
+                    id="g-first"
+                    required
+                    autoComplete="given-name"
+                    autoCapitalize="words"
+                    className={inputClass}
+                    value={guardian.first_name}
+                    onChange={(e) => setGuardian({ ...guardian, first_name: e.target.value })}
+                  />
                 </div>
                 <div>
-                  <label className={labelClass}>Last Name *</label>
-                  <input required className={inputClass} value={guardian.last_name} onChange={(e) => setGuardian({ ...guardian, last_name: e.target.value })} />
+                  <label className={labelClass} htmlFor="g-last">Last Name *</label>
+                  <input
+                    id="g-last"
+                    required
+                    autoComplete="family-name"
+                    autoCapitalize="words"
+                    className={inputClass}
+                    value={guardian.last_name}
+                    onChange={(e) => setGuardian({ ...guardian, last_name: e.target.value })}
+                  />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className={labelClass}>Email *</label>
-                  <input required type="email" className={inputClass} value={guardian.email} onChange={(e) => setGuardian({ ...guardian, email: e.target.value })} />
+                  <label className={labelClass} htmlFor="g-email">Email *</label>
+                  <input
+                    id="g-email"
+                    required
+                    type="email"
+                    inputMode="email"
+                    autoComplete="email"
+                    autoCapitalize="off"
+                    autoCorrect="off"
+                    spellCheck={false}
+                    pattern="[^\s@]+@[^\s@]+\.[^\s@]+"
+                    placeholder="you@example.com"
+                    className={inputClass}
+                    value={guardian.email}
+                    onChange={(e) => setGuardian({ ...guardian, email: e.target.value })}
+                  />
                 </div>
                 <div>
-                  <label className={labelClass}>Phone *</label>
-                  <input required type="tel" className={inputClass} value={guardian.phone} onChange={(e) => setGuardian({ ...guardian, phone: e.target.value })} />
+                  <label className={labelClass} htmlFor="g-phone">Phone *</label>
+                  <input
+                    id="g-phone"
+                    required
+                    type="tel"
+                    inputMode="tel"
+                    autoComplete="tel"
+                    pattern="\d{3}-\d{3}-\d{4}"
+                    placeholder="412-555-1234"
+                    maxLength={12}
+                    className={inputClass}
+                    value={guardian.phone}
+                    onChange={(e) => setGuardian({ ...guardian, phone: formatPhone(e.target.value) })}
+                  />
                 </div>
               </div>
               <div>
-                <label className={labelClass}>Address</label>
-                <input className={inputClass} placeholder="Street address" value={guardian.address_line1} onChange={(e) => setGuardian({ ...guardian, address_line1: e.target.value })} />
+                <label className={labelClass} htmlFor="g-addr">Address</label>
+                <input
+                  id="g-addr"
+                  autoComplete="street-address"
+                  className={inputClass}
+                  placeholder="Street address"
+                  value={guardian.address_line1}
+                  onChange={(e) => setGuardian({ ...guardian, address_line1: e.target.value })}
+                />
               </div>
               <div className="grid grid-cols-3 gap-4">
                 <div>
-                  <label className={labelClass}>City</label>
-                  <input className={inputClass} value={guardian.city} onChange={(e) => setGuardian({ ...guardian, city: e.target.value })} />
+                  <label className={labelClass} htmlFor="g-city">City</label>
+                  <input
+                    id="g-city"
+                    autoComplete="address-level2"
+                    autoCapitalize="words"
+                    className={inputClass}
+                    value={guardian.city}
+                    onChange={(e) => setGuardian({ ...guardian, city: e.target.value })}
+                  />
                 </div>
                 <div>
-                  <label className={labelClass}>State</label>
-                  <input className={inputClass} value={guardian.state} onChange={(e) => setGuardian({ ...guardian, state: e.target.value })} />
+                  <label className={labelClass} htmlFor="g-state">State</label>
+                  <input
+                    id="g-state"
+                    autoComplete="address-level1"
+                    autoCapitalize="characters"
+                    pattern="[A-Z]{2}"
+                    maxLength={2}
+                    placeholder="PA"
+                    className={inputClass}
+                    value={guardian.state}
+                    onChange={(e) => setGuardian({ ...guardian, state: formatState(e.target.value) })}
+                  />
                 </div>
                 <div>
-                  <label className={labelClass}>ZIP</label>
-                  <input className={inputClass} value={guardian.zip} onChange={(e) => setGuardian({ ...guardian, zip: e.target.value })} />
+                  <label className={labelClass} htmlFor="g-zip">ZIP</label>
+                  <input
+                    id="g-zip"
+                    type="text"
+                    inputMode="numeric"
+                    autoComplete="postal-code"
+                    pattern="\d{5}"
+                    maxLength={5}
+                    placeholder="15243"
+                    className={inputClass}
+                    value={guardian.zip}
+                    onChange={(e) => setGuardian({ ...guardian, zip: formatZip(e.target.value) })}
+                  />
                 </div>
               </div>
               <button
@@ -851,17 +966,43 @@ export default function RegisterPage() {
                 </div>
                 <div className="grid gap-4">
                   <div>
-                    <label className={labelClass}>Full Name *</label>
-                    <input className={inputClass} placeholder="First and Last Name" value={pickup.name} onChange={(e) => updatePickup(i, "name", e.target.value)} />
+                    <label className={labelClass} htmlFor={`p-name-${i}`}>Full Name *</label>
+                    <input
+                      id={`p-name-${i}`}
+                      autoComplete="name"
+                      autoCapitalize="words"
+                      className={inputClass}
+                      placeholder="First and Last Name"
+                      value={pickup.name}
+                      onChange={(e) => updatePickup(i, "name", e.target.value)}
+                    />
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className={labelClass}>Phone *</label>
-                      <input type="tel" className={inputClass} value={pickup.phone} onChange={(e) => updatePickup(i, "phone", e.target.value)} />
+                      <label className={labelClass} htmlFor={`p-phone-${i}`}>Phone *</label>
+                      <input
+                        id={`p-phone-${i}`}
+                        type="tel"
+                        inputMode="tel"
+                        autoComplete="tel"
+                        pattern="\d{3}-\d{3}-\d{4}"
+                        placeholder="412-555-1234"
+                        maxLength={12}
+                        className={inputClass}
+                        value={pickup.phone}
+                        onChange={(e) => updatePickup(i, "phone", formatPhone(e.target.value))}
+                      />
                     </div>
                     <div>
-                      <label className={labelClass}>Relationship *</label>
-                      <input className={inputClass} placeholder="e.g. Grandparent, Aunt" value={pickup.relationship} onChange={(e) => updatePickup(i, "relationship", e.target.value)} />
+                      <label className={labelClass} htmlFor={`p-rel-${i}`}>Relationship *</label>
+                      <input
+                        id={`p-rel-${i}`}
+                        autoCapitalize="words"
+                        className={inputClass}
+                        placeholder="e.g. Grandparent, Aunt"
+                        value={pickup.relationship}
+                        onChange={(e) => updatePickup(i, "relationship", e.target.value)}
+                      />
                     </div>
                   </div>
                 </div>
@@ -942,10 +1083,12 @@ export default function RegisterPage() {
               className="grid gap-4"
             >
               <div>
-                <label className={labelClass}>Age *</label>
+                <label className={labelClass} htmlFor="c-age">Age *</label>
                 <input
+                  id="c-age"
                   required
                   type="number"
+                  inputMode="numeric"
                   min="3"
                   max="18"
                   className={inputClass}
@@ -1027,9 +1170,12 @@ export default function RegisterPage() {
                 </span>
               </label>
               <div>
-                <label className={labelClass}>Digital Signature (Full Name) *</label>
+                <label className={labelClass} htmlFor="consent-sig">Digital Signature (Full Name) *</label>
                 <input
+                  id="consent-sig"
                   required
+                  autoComplete="name"
+                  autoCapitalize="words"
                   className={inputClass}
                   placeholder="Type your full legal name"
                   value={consent.signed_by}
