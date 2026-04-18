@@ -231,7 +231,7 @@ export async function POST(req: NextRequest) {
     emailSent = await sendConfirmationEmail({
       to: body.guardian.email,
       totalCents: body.amountCents,
-      stripePaymentId: body.stripePaymentId,
+      stripePaymentId: body.stripePaymentId ?? "",
       guardian: {
         firstName: body.guardian.first_name,
         lastName: body.guardian.last_name,

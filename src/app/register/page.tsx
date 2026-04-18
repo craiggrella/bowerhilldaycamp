@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import Header from "@/components/Header";
 import { motion, AnimatePresence } from "framer-motion";
 import { loadStripe } from "@stripe/stripe-js";
@@ -142,7 +143,10 @@ export default function RegisterPage() {
     fetchData();
   }, []);
 
-  // Hydrate form state from sessionStorage on mount (survives back-button)
+  // Hydrate form state from sessionStorage on mount (survives back-button).
+  // The setState calls here are a one-time hydration that only fires on mount,
+  // so the lint rule about cascading renders doesn't apply — disable for this block.
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     try {
       const raw = sessionStorage.getItem(STORAGE_KEY);
@@ -174,6 +178,7 @@ export default function RegisterPage() {
     }
     setHydrated(true);
   }, []);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   // Persist whenever the form state changes (after initial hydration)
   useEffect(() => {
@@ -338,7 +343,6 @@ export default function RegisterPage() {
   const uncoveredCampers = campers.filter((_, i) => !coveredCamperIndexes.has(i));
   const pickupReady = validPickups.length > 0 && uncoveredCampers.length === 0;
 
-  const camperInfoReady = campers.every((c) => c.age.trim() && c.allergies.trim());
   const consentReady = consent.signed_by.trim().length > 0;
 
   if (loading) {
@@ -1228,12 +1232,12 @@ export default function RegisterPage() {
               <p>70 Moffett St, Pittsburgh, PA 15243</p>
             </div>
 
-            <a
+            <Link
               href="/"
               className="block w-full text-center bg-[var(--color-primary)] hover:bg-[var(--color-primary-light)] text-white font-bold text-lg py-4 rounded-full transition-colors"
             >
               Back to Home
-            </a>
+            </Link>
             {registrationId && (
               <p className="text-center text-gray-300 text-xs mt-4 font-mono">
                 Ref: {registrationId.slice(0, 8)}

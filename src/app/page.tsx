@@ -4,8 +4,6 @@ import Link from "next/link";
 import Image from "next/image";
 import { motion } from "framer-motion";
 
-const colors = ["#FF6B35", "#E5243B", "#FFB800", "#4CAF50", "#7B2D8E", "#00BCD4"];
-
 // Real camp photos live in /public/images. Each tile keeps its original
 // square/rectangle shape and frame color; the image sits inside a 10px border.
 // Images 9, 10, and 11 get the biggest placements.

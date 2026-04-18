@@ -92,14 +92,6 @@ function scheduleFor(campName: string, optOut: boolean): string {
   return "9:30 AM – 3:00 PM";
 }
 
-function priceForGrade(grade: string): number {
-  const jrGrades = new Set(["Preschool", "K", "1st", "2nd"]);
-  if (!grade) return 0;
-  if (jrGrades.has(grade)) return 2500;
-  if (grade === "6th and up") return 2500;
-  return 7500;
-}
-
 function escapeHtml(s: string | null | undefined): string {
   if (!s) return "";
   return String(s)
