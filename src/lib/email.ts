@@ -153,6 +153,10 @@ function helperBadge(): string {
   return `<span style="border:1px solid #1d4ed8;color:#1d4ed8;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;padding:2px 6px;border-radius:3px;margin-left:4px">Helper</span>`;
 }
 
+function firstYearBadge(): string {
+  return `<span style="border:1px solid #166534;color:#166534;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;padding:2px 6px;border-radius:3px;margin-left:4px">1st Year — Free</span>`;
+}
+
 // ─── Admin alert ─────────────────────────────────────────
 
 // Sends a plain-text-ish HTML alert to the site admin. Fire-and-await at the
@@ -178,99 +182,27 @@ export async function notifyAdmin(subject: string, details: Record<string, unkno
   }
 }
 
-// ─── Receipt email ───────────────────────────────────────
+// ─── Combined confirmation + receipt email ───────────────
 
-export type ReceiptCamper = {
+export type ConfirmationCamper = {
   firstName: string;
   lastName: string;
   grade: string;
-  campName: string;
-  afternoonOptOut: boolean;
-};
-
-export type ReceiptData = {
-  to: string;
-  totalCents: number;
-  stripePaymentId: string;
-  campers: ReceiptCamper[];
-};
-
-export async function sendReceiptEmail(data: ReceiptData): Promise<boolean> {
-  const ref = data.stripePaymentId.slice(-12);
-
-  const camperRows = data.campers
-    .map((c) => {
-      const isHelper = c.grade === "6th and up";
-      const schedule = scheduleFor(c.campName, c.afternoonOptOut);
-      const price = priceForGrade(c.grade);
-      return `
-        <tr>
-          <td style="padding:12px 0;border-bottom:1px solid #ddd;vertical-align:top">
-            <div style="font-weight:700;font-size:15px;color:#000">${escapeHtml(c.firstName)} ${escapeHtml(c.lastName)}</div>
-            <div style="margin-top:4px">${campBadge(c.campName)}${isHelper ? helperBadge() : ""}</div>
-            <div style="font-size:13px;color:#000;margin-top:4px">Grade: ${escapeHtml(c.grade)} &bull; ${escapeHtml(schedule)}</div>
-          </td>
-          <td style="padding:12px 0;border-bottom:1px solid #ddd;vertical-align:top;text-align:right;font-weight:700;font-size:15px;color:#000;white-space:nowrap">
-            ${formatMoney(price)}
-          </td>
-        </tr>
-      `;
-    })
-    .join("");
-
-  const inner = `
-    <h1 style="font-size:24px;font-weight:800;margin:16px 0 8px;color:#000">Payment received — thank you!</h1>
-    <p style="font-size:14px;color:#000;margin:0 0 24px">Your registration for Bower Hill Day Camp is confirmed. Details below.</p>
-
-    <div style="border:1px solid #000;padding:14px 16px;margin-bottom:24px">
-      <table style="width:100%;font-size:14px;color:#000;border-collapse:collapse">
-        <tr>
-          <td style="padding:3px 0"><strong>Total paid</strong></td>
-          <td style="padding:3px 0;text-align:right">${formatMoney(data.totalCents)}</td>
-        </tr>
-        <tr>
-          <td style="padding:3px 0"><strong>Reference</strong></td>
-          <td style="padding:3px 0;text-align:right;font-family:monospace;font-size:12px">${escapeHtml(ref)}</td>
-        </tr>
-      </table>
-    </div>
-
-    <h2 style="font-size:16px;font-weight:700;margin:0 0 8px;color:#000;text-transform:uppercase;letter-spacing:0.04em">Campers</h2>
-    <table style="width:100%;border-collapse:collapse;border-top:1px solid #ddd">
-      ${camperRows}
-    </table>
-
-    <p style="font-size:13px;color:#000;margin:24px 0 0;line-height:1.5">
-      If you haven't already, please complete the emergency contact and medical info step — you'll receive a second email confirming those details once they're on file.
-    </p>
-  `;
-
-  return sendTransactional({
-    to: data.to,
-    subject: `Payment receipt — Bower Hill Day Camp`,
-    html: shell(inner),
-  });
-}
-
-// ─── Detailed confirmation email ─────────────────────────
-
-export type DetailedCamper = {
-  firstName: string;
-  lastName: string;
-  grade: string;
+  age: string;
   campName: string;
   afternoonOptOut: boolean;
   allergies: string | null;
-  medicalNotes: string | null;
+  firstYear: boolean;
+  priceCents: number;
 };
 
-export type DetailedEmergencyContact = {
+export type ConfirmationEmergencyContact = {
   name: string;
   relationship: string;
   phone: string;
 };
 
-export type DetailedGuardian = {
+export type ConfirmationGuardian = {
   firstName: string;
   lastName: string;
   email: string;
@@ -278,31 +210,36 @@ export type DetailedGuardian = {
   address: string;
 };
 
-export type DetailedData = {
+export type ConfirmationData = {
   to: string;
-  guardian: DetailedGuardian;
-  campers: DetailedCamper[];
-  emergencyContacts: DetailedEmergencyContact[];
+  totalCents: number;
+  stripePaymentId: string;
+  guardian: ConfirmationGuardian;
+  campers: ConfirmationCamper[];
+  emergencyContacts: ConfirmationEmergencyContact[];
 };
 
-export async function sendDetailedConfirmationEmail(data: DetailedData): Promise<boolean> {
+export async function sendConfirmationEmail(data: ConfirmationData): Promise<boolean> {
   const g = data.guardian;
+  const ref = data.stripePaymentId.slice(-12);
 
   const camperSections = data.campers
     .map((c) => {
       const isHelper = c.grade === "6th and up";
       const schedule = scheduleFor(c.campName, c.afternoonOptOut);
-      const price = priceForGrade(c.grade);
+      const priceLabel = c.firstYear
+        ? `${formatMoney(c.priceCents)} <span style="color:#166534;font-weight:700">(1st year — free)</span>`
+        : formatMoney(c.priceCents);
       return `
         <div style="border-bottom:1px solid #ddd;padding:14px 0">
           <div style="font-weight:700;font-size:16px;color:#000">${escapeHtml(c.firstName)} ${escapeHtml(c.lastName)}</div>
-          <div style="margin-top:4px">${campBadge(c.campName)}${isHelper ? helperBadge() : ""}</div>
+          <div style="margin-top:4px">${campBadge(c.campName)}${isHelper ? helperBadge() : ""}${c.firstYear ? firstYearBadge() : ""}</div>
           <table style="width:100%;margin-top:8px;font-size:13px;color:#000;border-collapse:collapse">
             <tr><td style="padding:2px 0;width:110px"><strong>Grade</strong></td><td style="padding:2px 0">${escapeHtml(c.grade)}</td></tr>
+            <tr><td style="padding:2px 0"><strong>Age</strong></td><td style="padding:2px 0">${escapeHtml(c.age)}</td></tr>
             <tr><td style="padding:2px 0"><strong>Schedule</strong></td><td style="padding:2px 0">${escapeHtml(schedule)}</td></tr>
-            <tr><td style="padding:2px 0"><strong>Price</strong></td><td style="padding:2px 0">${formatMoney(price)}</td></tr>
-            <tr><td style="padding:2px 0;vertical-align:top"><strong>Allergies</strong></td><td style="padding:2px 0">${escapeHtml(c.allergies) || "None"}</td></tr>
-            <tr><td style="padding:2px 0;vertical-align:top"><strong>Medical</strong></td><td style="padding:2px 0">${escapeHtml(c.medicalNotes) || "None"}</td></tr>
+            <tr><td style="padding:2px 0"><strong>Price</strong></td><td style="padding:2px 0">${priceLabel}</td></tr>
+            <tr><td style="padding:2px 0;vertical-align:top"><strong>Allergies / Medical</strong></td><td style="padding:2px 0">${escapeHtml(c.allergies) || "None"}</td></tr>
           </table>
         </div>
       `;
@@ -316,8 +253,22 @@ export async function sendDetailedConfirmationEmail(data: DetailedData): Promise
     : `<li style="color:#666">None on file</li>`;
 
   const inner = `
-    <h1 style="font-size:24px;font-weight:800;margin:16px 0 8px;color:#000">You're all set!</h1>
-    <p style="font-size:14px;color:#000;margin:0 0 24px">Here's the full record of your camp registration.</p>
+    <h1 style="font-size:24px;font-weight:800;margin:16px 0 8px;color:#000">You're registered — thank you!</h1>
+    <p style="font-size:14px;color:#000;margin:0 0 24px">This email is your receipt and a full record of your camp registration. Keep it handy — and feel free to print.</p>
+
+    <h2 style="font-size:13px;font-weight:700;margin:0 0 6px;color:#000;text-transform:uppercase;letter-spacing:0.04em">Payment</h2>
+    <div style="border:1px solid #000;padding:14px 16px;margin-bottom:24px">
+      <table style="width:100%;font-size:14px;color:#000;border-collapse:collapse">
+        <tr>
+          <td style="padding:3px 0"><strong>Total paid</strong></td>
+          <td style="padding:3px 0;text-align:right">${formatMoney(data.totalCents)}</td>
+        </tr>
+        <tr>
+          <td style="padding:3px 0"><strong>Reference</strong></td>
+          <td style="padding:3px 0;text-align:right;font-family:monospace;font-size:12px">${escapeHtml(ref)}</td>
+        </tr>
+      </table>
+    </div>
 
     <h2 style="font-size:13px;font-weight:700;margin:0 0 6px;color:#000;text-transform:uppercase;letter-spacing:0.04em">When &amp; where</h2>
     <div style="font-size:14px;color:#000;line-height:1.5;margin-bottom:24px">
@@ -331,15 +282,15 @@ export async function sendDetailedConfirmationEmail(data: DetailedData): Promise
       <tr><td style="padding:2px 0;width:90px"><strong>Name</strong></td><td style="padding:2px 0">${escapeHtml(g.firstName)} ${escapeHtml(g.lastName)}</td></tr>
       <tr><td style="padding:2px 0"><strong>Email</strong></td><td style="padding:2px 0">${escapeHtml(g.email)}</td></tr>
       <tr><td style="padding:2px 0"><strong>Phone</strong></td><td style="padding:2px 0">${escapeHtml(g.phone)}</td></tr>
-      <tr><td style="padding:2px 0;vertical-align:top"><strong>Address</strong></td><td style="padding:2px 0">${escapeHtml(g.address)}</td></tr>
+      ${g.address ? `<tr><td style="padding:2px 0;vertical-align:top"><strong>Address</strong></td><td style="padding:2px 0">${escapeHtml(g.address)}</td></tr>` : ""}
     </table>
 
     <h2 style="font-size:13px;font-weight:700;margin:0 0 6px;color:#000;text-transform:uppercase;letter-spacing:0.04em">Campers</h2>
-    <div style="border-top:1px solid #ddd">
+    <div style="border-top:1px solid #ddd;margin-bottom:24px">
       ${camperSections}
     </div>
 
-    <h2 style="font-size:13px;font-weight:700;margin:24px 0 6px;color:#000;text-transform:uppercase;letter-spacing:0.04em">Emergency contacts</h2>
+    <h2 style="font-size:13px;font-weight:700;margin:0 0 6px;color:#000;text-transform:uppercase;letter-spacing:0.04em">Emergency contacts</h2>
     <ul style="font-size:14px;color:#000;line-height:1.5;margin:0;padding-left:20px">
       ${ecRows}
     </ul>
@@ -347,7 +298,7 @@ export async function sendDetailedConfirmationEmail(data: DetailedData): Promise
 
   return sendTransactional({
     to: data.to,
-    subject: `Camp registration details — Bower Hill Day Camp`,
+    subject: `Bower Hill Day Camp — Registration receipt & details`,
     html: shell(inner),
   });
 }

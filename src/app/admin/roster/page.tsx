@@ -18,6 +18,7 @@ type RosterEntry = {
   grade: string | null;
   camp_type_name: string;
   afternoon_opt_out: boolean;
+  first_year: boolean;
   registration_id: string;
   guardian_name: string;
   guardian_phone: string;
@@ -33,6 +34,7 @@ type RawCamper = {
   last_name: string | null;
   grade: string | null;
   afternoon_opt_out: boolean;
+  first_year: boolean;
   registration_id: string;
   camp_types: { name: string } | { name: string }[] | null;
 };
@@ -70,7 +72,8 @@ type SortField =
   | "last_name"
   | "grade"
   | "camp_type_name"
-  | "guardian_name";
+  | "guardian_name"
+  | "first_year";
 type SortDir = "asc" | "desc";
 
 export default function RosterPage() {
@@ -150,6 +153,7 @@ export default function RosterPage() {
           grade: c.grade,
           camp_type_name: campTypeName || "—",
           afternoon_opt_out: !!c.afternoon_opt_out,
+          first_year: !!c.first_year,
           registration_id: c.registration_id,
           guardian_name: g ? `${g.first_name} ${g.last_name}` : "—",
           guardian_phone: g?.phone || "—",
@@ -177,6 +181,7 @@ export default function RosterPage() {
       r.grade || "",
       r.camp_type_name,
       r.afternoon_opt_out ? "morning only" : "full day",
+      r.first_year ? "1st year first year yes" : "no",
       r.guardian_name,
       r.guardian_phone,
       r.guardian_email,
@@ -202,6 +207,10 @@ export default function RosterPage() {
       }
       return r.camp_type_name;
     }
+    if (field === "first_year") {
+      // Yes (first-year) sorts above No when ascending.
+      return r.first_year ? "0 yes" : "1 no";
+    }
     return (r[field] || "").toString();
   }
 
@@ -225,11 +234,19 @@ export default function RosterPage() {
       </div>
 
       <div className="max-w-[1200px] mx-auto px-6 py-8">
-        <div className="print:hidden flex items-center justify-between mb-4">
-          <h1 className="text-2xl font-bold text-[var(--color-primary)]">
-            Camp Roster ({filtered.length} campers)
-          </h1>
-          <div className="flex items-center gap-3">
+        <div className="print:hidden flex items-center justify-between mb-4 gap-3 flex-wrap">
+          <div className="flex items-center gap-3 flex-wrap">
+            <a
+              href="/admin"
+              className="text-sm text-[var(--color-primary)] hover:underline font-medium"
+            >
+              &larr; Back to Dashboard
+            </a>
+            <h1 className="text-2xl font-bold text-[var(--color-primary)]">
+              Camp Roster ({filtered.length} campers)
+            </h1>
+          </div>
+          <div className="flex items-center gap-3 flex-wrap">
             <select
               className="border border-gray-300 rounded-lg px-3 py-2 text-sm"
               value={campFilter}
@@ -285,8 +302,8 @@ export default function RosterPage() {
         ) : filtered.length === 0 ? (
           <p className="text-gray-400">No campers found.</p>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm border-collapse">
+          <div className="overflow-x-auto -mx-6 px-6 print:mx-0 print:px-0">
+            <table className="w-full text-sm border-collapse min-w-[900px] print:min-w-0">
               <thead>
                 <tr className="border-b-2 border-gray-300">
                   <th
@@ -312,6 +329,12 @@ export default function RosterPage() {
                     className="text-left py-3 px-2 font-bold text-gray-700 cursor-pointer select-none hover:text-[var(--color-primary)] print:cursor-auto print:hover:text-gray-700"
                   >
                     Camp{sortArrow("camp_type_name")}
+                  </th>
+                  <th
+                    onClick={() => toggleSort("first_year")}
+                    className="text-left py-3 px-2 font-bold text-gray-700 cursor-pointer select-none hover:text-[var(--color-primary)] print:cursor-auto print:hover:text-gray-700"
+                  >
+                    1st Year{sortArrow("first_year")}
                   </th>
                   <th
                     onClick={() => toggleSort("guardian_name")}
@@ -349,6 +372,15 @@ export default function RosterPage() {
                           </span>
                         )}
                       </div>
+                    </td>
+                    <td className="py-3 px-2">
+                      {r.first_year ? (
+                        <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 print:px-0 print:bg-transparent print:text-emerald-700">
+                          Yes
+                        </span>
+                      ) : (
+                        <span className="text-gray-300 text-xs">—</span>
+                      )}
                     </td>
                     <td className="py-3 px-2 text-gray-600">
                       <div>{r.guardian_name}</div>

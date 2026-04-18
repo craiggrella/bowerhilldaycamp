@@ -40,6 +40,7 @@ create table campers (
   grade text,
   role text,
   afternoon_opt_out boolean not null default false,
+  first_year boolean not null default false,
   created_at timestamptz default now()
 );
 

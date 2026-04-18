@@ -8,6 +8,7 @@ type Camper = {
   last_name: string | null;
   grade: string | null;
   afternoon_opt_out: boolean;
+  first_year: boolean;
   registration_id: string;
   camp_types: { name: string } | { name: string }[] | null;
 };
@@ -62,7 +63,7 @@ export async function GET() {
 
   const campersRes = await supabaseAdmin
     .from("campers")
-    .select("id, first_name, last_name, grade, afternoon_opt_out, registration_id, camp_types(name)")
+    .select("id, first_name, last_name, grade, afternoon_opt_out, first_year, registration_id, camp_types(name)")
     .order("last_name")
     .order("first_name");
 
@@ -120,6 +121,7 @@ export async function GET() {
     "Last Name",
     "Grade",
     "Camp",
+    "1st Year",
     "Schedule",
     "Guardian",
     "Guardian Phone",
@@ -146,6 +148,7 @@ export async function GET() {
       c.last_name || "",
       c.grade || "",
       campLabel,
+      c.first_year ? "Yes" : "",
       scheduleFor(campName || "", c.afternoon_opt_out),
       g ? `${g.first_name} ${g.last_name}` : "",
       g?.phone || "",

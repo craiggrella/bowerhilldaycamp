@@ -6,16 +6,17 @@ import { motion } from "framer-motion";
 
 const colors = ["#FF6B35", "#E5243B", "#FFB800", "#4CAF50", "#7B2D8E", "#00BCD4"];
 
-// Placeholder images — replace with real camp photos
+// Real camp photos live in /public/images. Each tile keeps its original
+// square/rectangle shape and frame color; the image sits inside a 10px border.
+// Images 9, 10, and 11 get the biggest placements.
 const galleryImages = [
-  { alt: "Kids at camp",         color: "#FF6B35", span: "md:col-span-2 md:row-span-2" },  // big top-left
-  { alt: "Crafts time",          color: "#4CAF50", span: "" },                               // top mid
-  { alt: "Outdoor games",        color: "#7B2D8E", span: "" },                               // top right
-  { alt: "Group singing",        color: "#E5243B", span: "" },                               // mid col3
-  { alt: "Science experiments",  color: "#00BCD4", span: "" },                               // mid col4
-  { alt: "Bible stories",        color: "#C41E3A", span: "" },                               // bot left
-  { alt: "Making friends",       color: "#5B2C87", span: "" },                               // bot mid
-  { alt: "Water games",          color: "#FFB800", span: "md:col-span-2" },                  // bot right wide
+  { src: "/images/BHCC Day Camp 00009.png", alt: "Kids at camp",        color: "#FF6B35", span: "md:col-span-2 md:row-span-2" }, // big 2x2 top-left
+  { src: "/images/BHCC Day Camp 00001.png", alt: "Crafts time",         color: "#4CAF50", span: "" },
+  { src: "/images/BHCC Day Camp 00010.png", alt: "Outdoor games",       color: "#7B2D8E", span: "md:row-span-2" },                 // tall right
+  { src: "/images/BHCC Day Camp 00002.png", alt: "Group singing",       color: "#E5243B", span: "" },
+  { src: "/images/BHCC Day Camp 00003.png", alt: "Science experiments", color: "#00BCD4", span: "" },
+  { src: "/images/BHCC Day Camp 00004.png", alt: "Bible stories",       color: "#C41E3A", span: "" },
+  { src: "/images/BHCC Day Camp 00011.png", alt: "Water games",         color: "#FFB800", span: "md:col-span-2" },                // wide bottom-right
 ];
 
 export default function Home() {
@@ -69,9 +70,9 @@ export default function Home() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 0.6, delay: 0.5 }}
-            className="text-white/50 text-sm md:text-base mb-10 tracking-wide"
+            className="text-white text-2xl md:text-4xl font-bold mb-10 tracking-tight"
           >
-            Summer 2026 &bull; Bower Hill Community Church
+            July 27th – 31st, 2026
           </motion.p>
 
           <motion.div
@@ -119,14 +120,7 @@ export default function Home() {
           >
             This Is <span className="bg-gradient-to-r from-[#FFB800] to-[#FF6B35] bg-clip-text text-transparent">Camp</span>
           </motion.h2>
-          <motion.p
-            initial={{ opacity: 0 }}
-            whileInView={{ opacity: 1 }}
-            viewport={{ once: true }}
-            className="text-white/40 text-center mb-14 text-sm"
-          >
-            Drop your camp photos here to bring this to life
-          </motion.p>
+          <div className="mb-14" />
 
           {/* Photo grid — 4 cols, 3 rows */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 auto-rows-[180px]">
@@ -137,16 +131,16 @@ export default function Home() {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ delay: i * 0.08 }}
-                className={`relative overflow-hidden rounded-2xl ${img.span} group cursor-pointer`}
+                className={`relative overflow-hidden rounded-2xl ${img.span} group`}
+                style={{ border: `10px solid ${img.color}` }}
               >
-                <div
-                  className="absolute inset-0 transition-transform duration-500 group-hover:scale-110"
-                  style={{ backgroundColor: img.color }}
+                <Image
+                  src={img.src}
+                  alt={img.alt}
+                  fill
+                  sizes="(min-width: 768px) 25vw, 50vw"
+                  className="object-cover transition-transform duration-500 group-hover:scale-110"
                 />
-                <div className="absolute inset-0 bg-[#1a0e2e]/20 group-hover:bg-[#1a0e2e]/10 transition-colors" />
-                <div className="absolute bottom-4 left-4 text-white/60 text-sm font-medium">
-                  {img.alt}
-                </div>
               </motion.div>
             ))}
           </div>
@@ -225,12 +219,9 @@ export default function Home() {
           <div className="inline-block bg-gradient-to-r from-[#FF6B35] to-[#FFB800] rounded-full px-4 py-1 text-xs font-bold uppercase tracking-widest text-black mb-8">
             From a real parent
           </div>
-          <blockquote className="text-2xl md:text-4xl font-bold text-white/90 leading-tight mb-8">
+          <blockquote className="text-2xl md:text-4xl font-bold text-white/90 leading-tight">
             &ldquo;My daughter talked about Day Camp every single day for the rest of the summer.&rdquo;
           </blockquote>
-          <p className="text-white/30 text-sm uppercase tracking-widest">
-            Sarah M. &bull; Parent of a 2025 Camper
-          </p>
         </motion.div>
       </section>
 
@@ -284,18 +275,6 @@ export default function Home() {
         </motion.div>
       </section>
 
-      {/* ===================== FOOTER ===================== */}
-      <footer className="bg-[#1a0e2e] py-10 px-6 border-t border-white/5">
-        <div className="max-w-4xl mx-auto text-center">
-          <p className="text-white/20 text-xs">
-            &copy; {new Date().getFullYear()}{" "}
-            <a href="https://www.bowerhillchurch.org/" target="_blank" rel="noopener noreferrer" className="hover:text-white/40 underline">
-              Bower Hill Community Church
-            </a>
-            . All rights reserved.
-          </p>
-        </div>
-      </footer>
     </div>
   );
 }

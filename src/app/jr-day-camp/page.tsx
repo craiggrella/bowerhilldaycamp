@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import Header from "@/components/Header";
 
 export default function JrDayCampPage() {
@@ -6,38 +7,52 @@ export default function JrDayCampPage() {
     <div className="min-h-screen bg-gray-50">
       <Header />
 
-      <div className="max-w-3xl mx-auto px-6 py-16">
-        {/* Title block */}
-        <div className="text-center mb-10">
-          <span className="inline-block text-xs font-bold uppercase tracking-widest px-3 py-1 rounded-full bg-green-100 text-green-700 mb-4">
+      {/* Solid-color hero with title, pill, and quick facts */}
+      <div className="w-full bg-[#3b2562] text-white py-12 md:py-16">
+        <div className="max-w-3xl mx-auto px-6 text-center">
+          <span className="inline-block text-xs font-bold uppercase tracking-widest px-3 py-1 rounded-full bg-white text-purple-700 mb-4">
             Half Day
           </span>
-          <h1 className="text-4xl md:text-5xl font-bold text-[var(--color-primary)] mb-3">
+          <h1 className="text-4xl md:text-5xl font-bold mb-3">
             Jr Day Camp
           </h1>
-          <p className="text-gray-500 text-lg">
+          <p className="text-white/80 text-lg mb-8">
             A gentle half-day for our youngest campers — preschool through 2nd grade.
           </p>
+          <div className="grid sm:grid-cols-3 gap-4">
+            <div className="bg-white rounded-xl p-5 text-center">
+              <div className="text-xs uppercase tracking-wide text-gray-400 mb-1">Grades</div>
+              <div className="font-bold text-gray-900">PreK – 2nd</div>
+            </div>
+            <div className="bg-white rounded-xl p-5 text-center">
+              <div className="text-xs uppercase tracking-wide text-gray-400 mb-1">Hours</div>
+              <div className="font-bold text-gray-900">9:30 AM – 12:00 PM</div>
+            </div>
+            <div className="bg-white rounded-xl p-5 text-center">
+              <div className="text-xs uppercase tracking-wide text-gray-400 mb-1">Price</div>
+              <div className="font-bold text-gray-900">$25</div>
+            </div>
+          </div>
         </div>
+      </div>
 
-        {/* Quick facts */}
-        <div className="grid sm:grid-cols-3 gap-4 mb-10">
-          <div className="bg-white rounded-xl border border-gray-200 p-5 text-center">
-            <div className="text-xs uppercase tracking-wide text-gray-400 mb-1">Grades</div>
-            <div className="font-bold text-gray-900">PreK – 2nd</div>
-          </div>
-          <div className="bg-white rounded-xl border border-gray-200 p-5 text-center">
-            <div className="text-xs uppercase tracking-wide text-gray-400 mb-1">Hours</div>
-            <div className="font-bold text-gray-900">9:30 AM – 12:00 PM</div>
-          </div>
-          <div className="bg-white rounded-xl border border-gray-200 p-5 text-center">
-            <div className="text-xs uppercase tracking-wide text-gray-400 mb-1">Price</div>
-            <div className="font-bold text-gray-900">$25</div>
-          </div>
+      <div className="max-w-3xl mx-auto px-6 py-12">
+        {/* Photo */}
+        <div
+          className="relative w-full h-[260px] md:h-[400px] rounded-2xl overflow-hidden mb-10"
+          style={{ border: "10px solid #00BCD4" }}
+        >
+          <Image
+            src="/images/BHCC Day Camp 00010.png"
+            alt="Jr Day Camp little ones"
+            fill
+            sizes="(min-width: 768px) 768px, 100vw"
+            className="object-cover object-center"
+          />
         </div>
 
         {/* Description */}
-        <div className="prose prose-gray max-w-none mb-10 text-gray-700 leading-relaxed">
+        <div className="space-y-6 max-w-none mb-10 text-gray-700 leading-relaxed">
           <p>
             Jr Day Camp is a perfect first taste of camp — half-day, low-key, and
             packed with the things little kids love: crafts, songs, simple games,

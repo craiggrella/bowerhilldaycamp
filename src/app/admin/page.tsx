@@ -13,6 +13,7 @@ type CamperRow = {
   camp_type_id: string;
   grade: string | null;
   afternoon_opt_out: boolean;
+  first_year: boolean;
   registration_id: string;
   created_at: string;
   camp_types: { name: string } | null;
@@ -203,6 +204,11 @@ export default function AdminPage() {
                             {c.afternoon_opt_out && (
                               <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">
                                 Morning only
+                              </span>
+                            )}
+                            {c.first_year && (
+                              <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">
+                                1st Year
                               </span>
                             )}
                             <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${

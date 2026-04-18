@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import Header from "@/components/Header";
 import { motion, AnimatePresence } from "framer-motion";
 import { loadStripe } from "@stripe/stripe-js";
-import { Elements, PaymentElement, LinkAuthenticationElement, useStripe, useElements } from "@stripe/react-stripe-js";
+import { Elements, PaymentElement, useStripe, useElements } from "@stripe/react-stripe-js";
 
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
 
@@ -24,25 +24,80 @@ type CamperEntry = {
   firstName: string;
   lastName: string;
   grade: string;
+  age: string;
+  allergies: string;
   campType: CampType | null;
   priceCents: number;
   afternoonOptOut: boolean;
+  firstYear: boolean | null; // null = unanswered for eligible grades
 };
 
-type Step = "count" | "details" | "checkout" | "payment" | "confirmed";
+type Guardian = {
+  first_name: string;
+  last_name: string;
+  email: string;
+  phone: string;
+  address_line1: string;
+  city: string;
+  state: string;
+  zip: string;
+};
+
+type Pickup = {
+  name: string;
+  phone: string;
+  relationship: string;
+  camperIndexes: number[]; // indexes into campers[] (before we have ids)
+};
+
+type Consent = {
+  liability_waiver: boolean;
+  photo_release: boolean;
+  signed_by: string;
+};
+
+type Step =
+  | "count"
+  | "details"
+  | "guardian"
+  | "pickup"
+  | "camperInfo"
+  | "consent"
+  | "review"
+  | "payment"
+  | "confirmed";
 
 // ─── Constants ───────────────────────────────────────────
 
 const GRADE_OPTIONS = ["Preschool", "K", "1st", "2nd", "3rd", "4th", "5th", "6th and up"];
 const JR_GRADES = new Set(["Preschool", "K", "1st", "2nd"]);
+const FIRST_YEAR_ELIGIBLE_GRADES = new Set(["Preschool", "K", "1st", "2nd", "3rd"]);
 const HELPER_GRADE = "6th and up";
 
-function emptyCamper(): CamperEntry {
-  return { firstName: "", lastName: "", grade: "", campType: null, priceCents: 0, afternoonOptOut: false };
+function isFirstYearEligibleGrade(grade: string): boolean {
+  return FIRST_YEAR_ELIGIBLE_GRADES.has(grade);
 }
 
-function getPriceCents(grade: string): number {
+function emptyCamper(): CamperEntry {
+  return { firstName: "", lastName: "", grade: "", age: "", allergies: "", campType: null, priceCents: 0, afternoonOptOut: false, firstYear: null };
+}
+
+function emptyGuardian(): Guardian {
+  return { first_name: "", last_name: "", email: "", phone: "", address_line1: "", city: "", state: "", zip: "" };
+}
+
+function emptyPickup(): Pickup {
+  return { name: "", phone: "", relationship: "", camperIndexes: [] };
+}
+
+function emptyConsent(): Consent {
+  return { liability_waiver: false, photo_release: false, signed_by: "" };
+}
+
+function getPriceCents(grade: string, firstYear: boolean | null): number {
   if (!grade) return 0;
+  // First-year registrants in eligible grades (3rd and under) attend for free.
+  if (firstYear === true && isFirstYearEligibleGrade(grade)) return 0;
   if (JR_GRADES.has(grade)) return 2500;
   if (grade === HELPER_GRADE) return 2500;
   return 7500;
@@ -61,11 +116,17 @@ export default function RegisterPage() {
   const [campTypes, setCampTypes] = useState<CampType[]>([]);
   const [numCampers, setNumCampers] = useState(1);
   const [campers, setCampers] = useState<CamperEntry[]>([]);
+  const [guardian, setGuardian] = useState<Guardian>(emptyGuardian());
+  const [pickups, setPickups] = useState<Pickup[]>([emptyPickup()]);
+  const [sameContactForAll, setSameContactForAll] = useState(true);
+  const [currentCamperInfo, setCurrentCamperInfo] = useState(0);
+  const [consent, setConsent] = useState<Consent>(emptyConsent());
   const [loading, setLoading] = useState(true);
   const [registrationId, setRegistrationId] = useState<string | null>(null);
   const [hydrated, setHydrated] = useState(false);
 
   const totalCents = campers.reduce((sum, c) => sum + c.priceCents, 0);
+  const numKids = campers.length;
 
   useEffect(() => {
     async function fetchData() {
@@ -89,9 +150,24 @@ export default function RegisterPage() {
         const saved = JSON.parse(raw);
         if (typeof saved.numCampers === "number") setNumCampers(saved.numCampers);
         if (Array.isArray(saved.campers) && saved.campers.length) setCampers(saved.campers);
+        if (saved.guardian) setGuardian(saved.guardian);
+        if (Array.isArray(saved.pickups) && saved.pickups.length) setPickups(saved.pickups);
+        if (typeof saved.sameContactForAll === "boolean") setSameContactForAll(saved.sameContactForAll);
+        if (typeof saved.currentCamperInfo === "number") setCurrentCamperInfo(saved.currentCamperInfo);
+        if (saved.consent) setConsent(saved.consent);
         // Don't restore terminal/transient steps — bounce back to review
-        if (saved.step === "details" || saved.step === "checkout") setStep(saved.step);
-        else if (saved.step === "payment" || saved.step === "confirmed") setStep("checkout");
+        if (
+          saved.step === "details" ||
+          saved.step === "guardian" ||
+          saved.step === "pickup" ||
+          saved.step === "camperInfo" ||
+          saved.step === "consent" ||
+          saved.step === "review"
+        ) {
+          setStep(saved.step);
+        } else if (saved.step === "payment" || saved.step === "confirmed") {
+          setStep("review");
+        }
       }
     } catch {
       // ignore corrupt storage
@@ -104,11 +180,14 @@ export default function RegisterPage() {
     if (!hydrated) return;
     if (step === "confirmed") return; // confirmed clears storage explicitly in handleCheckout
     try {
-      sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ numCampers, campers, step }));
+      sessionStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({ numCampers, campers, guardian, pickups, sameContactForAll, currentCamperInfo, consent, step })
+      );
     } catch {
       // ignore quota / private mode failures
     }
-  }, [hydrated, numCampers, campers, step]);
+  }, [hydrated, numCampers, campers, guardian, pickups, sameContactForAll, currentCamperInfo, consent, step]);
 
   function resolveCampType(grade: string): CampType | null {
     if (!grade) return null;
@@ -131,7 +210,7 @@ export default function RegisterPage() {
 
   // ─── Camper updates ──────────────────────────────────
 
-  function updateCamper(index: number, field: "firstName" | "lastName", value: string) {
+  function updateCamperField<K extends keyof CamperEntry>(index: number, field: K, value: CamperEntry[K]) {
     setCampers((prev) => prev.map((c, i) => (i === index ? { ...c, [field]: value } : c)));
   }
 
@@ -139,13 +218,25 @@ export default function RegisterPage() {
     setCampers((prev) =>
       prev.map((c, i) => {
         if (i !== index) return c;
+        // Only ask the first-year question for eligible grades; non-eligible grades always store false.
+        const newFirstYear = isFirstYearEligibleGrade(grade) ? null : false;
         return {
           ...c,
           grade,
           campType: resolveCampType(grade),
-          priceCents: getPriceCents(grade),
+          priceCents: getPriceCents(grade, newFirstYear),
           afternoonOptOut: false,
+          firstYear: newFirstYear,
         };
+      })
+    );
+  }
+
+  function setFirstYear(index: number, value: boolean) {
+    setCampers((prev) =>
+      prev.map((c, i) => {
+        if (i !== index) return c;
+        return { ...c, firstYear: value, priceCents: getPriceCents(c.grade, value) };
       })
     );
   }
@@ -156,30 +247,61 @@ export default function RegisterPage() {
     );
   }
 
-  // ─── Checkout ────────────────────────────────────────
+  function updatePickup(index: number, field: keyof Pickup, value: string) {
+    setPickups((prev) => prev.map((p, i) => (i === index ? { ...p, [field]: value } : p)));
+  }
 
-  async function handleCheckout(stripePaymentId: string, stripeStatus: string, contactEmail: string) {
+  function togglePickupCamper(pickupIndex: number, camperIndex: number) {
+    setPickups((prev) =>
+      prev.map((p, i) => {
+        if (i !== pickupIndex) return p;
+        const has = p.camperIndexes.includes(camperIndex);
+        return {
+          ...p,
+          camperIndexes: has
+            ? p.camperIndexes.filter((x) => x !== camperIndex)
+            : [...p.camperIndexes, camperIndex],
+        };
+      })
+    );
+  }
+
+  // ─── Submission after payment succeeds ───────────────
+
+  async function handleCheckout(stripePaymentId: string, stripeStatus: string) {
     try {
       const res = await fetch("/api/registrations", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           amountCents: totalCents,
-          stripePaymentId,
-          stripeStatus,
-          contactEmail,
+          stripePaymentId: stripePaymentId || null,
+          stripeStatus: stripeStatus || (totalCents === 0 ? "free" : "unknown"),
           campers: campers.map((c) => ({
             campTypeId: c.campType?.id ?? null,
             firstName: c.firstName,
             lastName: c.lastName,
             grade: c.grade,
+            age: c.age,
+            allergies: c.allergies,
             afternoonOptOut: c.afternoonOptOut,
+            firstYear: c.firstYear === true,
+            priceCents: c.priceCents,
           })),
+          guardian,
+          pickups: pickups.filter((p) => p.name.trim()),
+          sameContactForAll,
+          consent,
         }),
       });
       const data = await res.json();
       if (!res.ok) {
-        alert("Payment succeeded but we hit a problem saving your registration. Please contact us — your charge ID is " + stripePaymentId + "\n\n" + (data.error || ""));
+        alert(
+          "Payment succeeded but we hit a problem saving your registration. Please contact us — your charge ID is " +
+            stripePaymentId +
+            "\n\n" +
+            (data.error || "")
+        );
         console.error("Registration save failed:", data);
         return;
       }
@@ -187,14 +309,37 @@ export default function RegisterPage() {
       setStep("confirmed");
       try { sessionStorage.removeItem(STORAGE_KEY); } catch {}
     } catch (e) {
-      alert("Payment succeeded but we couldn't reach the server. Please contact us — your charge ID is " + stripePaymentId);
+      alert(
+        "Payment succeeded but we couldn't reach the server. Please contact us — your charge ID is " +
+          stripePaymentId
+      );
       console.error(e);
     }
   }
 
   // ─── Derived ─────────────────────────────────────────
 
-  const detailsReady = campers.every((c) => c.firstName.trim() && c.lastName.trim() && c.grade);
+  const detailsReady = campers.every((c) => {
+    if (!c.firstName.trim() || !c.lastName.trim() || !c.grade) return false;
+    // If the grade is eligible for the first-year question, require an explicit answer.
+    if (isFirstYearEligibleGrade(c.grade) && c.firstYear === null) return false;
+    return true;
+  });
+
+  const guardianReady =
+    guardian.first_name.trim() && guardian.last_name.trim() && guardian.email.trim() && guardian.phone.trim();
+
+  const validPickups = pickups.filter((p) => p.name.trim() && p.phone.trim() && p.relationship.trim());
+  const coveredCamperIndexes = new Set<number>(
+    sameContactForAll
+      ? campers.map((_, i) => i)
+      : validPickups.flatMap((p) => p.camperIndexes)
+  );
+  const uncoveredCampers = campers.filter((_, i) => !coveredCamperIndexes.has(i));
+  const pickupReady = validPickups.length > 0 && uncoveredCampers.length === 0;
+
+  const camperInfoReady = campers.every((c) => c.age.trim() && c.allergies.trim());
+  const consentReady = consent.signed_by.trim().length > 0;
 
   if (loading) {
     return (
@@ -209,11 +354,18 @@ export default function RegisterPage() {
   const stepList: { key: Step; label: string }[] = [
     { key: "count", label: "1. Campers" },
     { key: "details", label: "2. Details" },
-    { key: "checkout", label: "3. Review" },
-    { key: "payment", label: "4. Payment" },
+    { key: "guardian", label: "3. Parent" },
+    { key: "pickup", label: "4. Pickup" },
+    { key: "camperInfo", label: "5. Info" },
+    { key: "consent", label: "6. Waivers" },
+    { key: "review", label: "7. Review" },
+    { key: "payment", label: "8. Pay" },
   ];
 
   const showProgress = step !== "count" && step !== "confirmed";
+
+  const inputClass = "w-full border border-gray-300 rounded-lg px-4 py-3 text-gray-900 focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)] focus:border-transparent";
+  const labelClass = "block text-sm font-medium text-gray-700 mb-1";
 
   // ─── Render ──────────────────────────────────────────
 
@@ -223,9 +375,9 @@ export default function RegisterPage() {
 
       {showProgress && (
         <div className="max-w-2xl mx-auto px-6 pt-8 w-full">
-          <div className="flex items-center gap-2 text-sm mb-8 flex-wrap">
+          <div className="flex items-center gap-1 text-xs mb-8 flex-wrap">
             {stepList.map((s, i) => (
-              <span key={s.key} className="flex items-center gap-2">
+              <span key={s.key} className="flex items-center gap-1">
                 {i > 0 && <span className="text-gray-300">&rarr;</span>}
                 <span className={step === s.key ? "font-bold text-[var(--color-primary)]" : "text-gray-400"}>
                   {s.label}
@@ -367,7 +519,7 @@ export default function RegisterPage() {
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
                 <p className="font-semibold text-blue-900 text-xs mb-2">6th grade and up — helpers</p>
                 <p className="text-blue-900 text-xs leading-snug">
-                  Kids who&apos;ve finished 6th grade or beyond join as helpers, supporting staff in a leadership role with our younger campers. That&apos;s why we offer a special helper rate of $25 per camper at 6th grade and up.
+                  Kids who&apos;ve finished 6th grade or beyond join as helpers, supporting our staff in a leadership role with our younger campers. That&apos;s why we offer a special helper rate of $25 per camper at 6th grade and up.
                 </p>
               </div>
             </aside>
@@ -388,19 +540,19 @@ export default function RegisterPage() {
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">First Name</label>
                       <input
-                        className="w-full border border-gray-300 rounded-lg px-4 py-3 text-gray-900 focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)] focus:border-transparent"
+                        className={inputClass}
                         placeholder="First name"
                         value={camper.firstName}
-                        onChange={(e) => updateCamper(i, "firstName", e.target.value)}
+                        onChange={(e) => updateCamperField(i, "firstName", e.target.value)}
                       />
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Last Name</label>
                       <input
-                        className="w-full border border-gray-300 rounded-lg px-4 py-3 text-gray-900 focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)] focus:border-transparent"
+                        className={inputClass}
                         placeholder="Last name"
                         value={camper.lastName}
-                        onChange={(e) => updateCamper(i, "lastName", e.target.value)}
+                        onChange={(e) => updateCamperField(i, "lastName", e.target.value)}
                       />
                     </div>
                   </div>
@@ -408,7 +560,7 @@ export default function RegisterPage() {
                   <div className="mb-4">
                     <label className="block text-sm font-medium text-gray-700 mb-1">Last Grade Completed</label>
                     <select
-                      className="w-full border border-gray-300 rounded-lg px-4 py-3 text-gray-900 focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)] focus:border-transparent"
+                      className={inputClass}
                       value={camper.grade}
                       onChange={(e) => updateGrade(i, e.target.value)}
                     >
@@ -419,7 +571,6 @@ export default function RegisterPage() {
                     </select>
                   </div>
 
-                  {/* Camp type badge (appears after grade selection) */}
                   {camper.campType && (
                     <motion.div
                       initial={{ opacity: 0, height: 0 }}
@@ -449,7 +600,6 @@ export default function RegisterPage() {
                     </motion.div>
                   )}
 
-                  {/* Afternoon opt-out checkbox (Day Camp only) */}
                   {camper.campType?.name === "Day Camp" && (
                     <motion.label
                       initial={{ opacity: 0, height: 0 }}
@@ -470,11 +620,49 @@ export default function RegisterPage() {
                       </div>
                     </motion.label>
                   )}
+
+                  {isFirstYearEligibleGrade(camper.grade) && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: "auto" }}
+                      className="mt-3 bg-emerald-50 border border-emerald-200 rounded-lg p-3"
+                    >
+                      <p className="text-sm font-medium text-emerald-900 mb-1">
+                        Is this their first year at Bower Hill Day Camp?
+                      </p>
+                      <p className="text-xs text-emerald-800 mb-3">
+                        First-year campers in 3rd grade and under attend for <strong>FREE</strong>.
+                      </p>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setFirstYear(i, true)}
+                          className={`text-sm font-semibold px-4 py-1.5 rounded-full border transition-colors ${
+                            camper.firstYear === true
+                              ? "bg-emerald-600 text-white border-emerald-600"
+                              : "bg-white text-emerald-700 border-emerald-300 hover:border-emerald-500"
+                          }`}
+                        >
+                          Yes — first year
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setFirstYear(i, false)}
+                          className={`text-sm font-semibold px-4 py-1.5 rounded-full border transition-colors ${
+                            camper.firstYear === false
+                              ? "bg-emerald-600 text-white border-emerald-600"
+                              : "bg-white text-emerald-700 border-emerald-300 hover:border-emerald-500"
+                          }`}
+                        >
+                          No — returning
+                        </button>
+                      </div>
+                    </motion.div>
+                  )}
                 </div>
               ))}
             </div>
 
-            {/* Running total */}
             {campers.some((c) => c.campType) && (
               <div className="mt-6 bg-white border border-gray-200 rounded-xl p-4">
                 {campers.filter((c) => c.campType).map((c, i) => (
@@ -492,11 +680,11 @@ export default function RegisterPage() {
             )}
 
             <button
-              onClick={() => setStep("checkout")}
+              onClick={() => setStep("guardian")}
               disabled={!detailsReady}
               className="mt-6 w-full bg-[var(--color-primary)] hover:bg-[var(--color-primary-light)] text-white font-bold text-lg py-4 rounded-full transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
             >
-              Continue to Review
+              Continue to Parent Info
             </button>
 
             </div>
@@ -504,10 +692,10 @@ export default function RegisterPage() {
           </motion.div>
         )}
 
-        {/* ═══════ SCREEN 3: REVIEW & CHECKOUT ═══════ */}
-        {step === "checkout" && (
+        {/* ═══════ SCREEN 3: GUARDIAN ═══════ */}
+        {step === "guardian" && (
           <motion.div
-            key="checkout"
+            key="guardian"
             initial={{ opacity: 0, x: 30 }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -30 }}
@@ -518,56 +706,456 @@ export default function RegisterPage() {
               &larr; Back
             </button>
             <h1 className="text-3xl font-bold text-[var(--color-primary)] mb-2">
-              Review &amp; Complete
+              Parent / Guardian
             </h1>
-            <p className="text-gray-500 mb-6">
-              After checkout you&apos;ll receive an email with a printable schedule for each camper.
+            <p className="text-gray-500 mb-6">This is where we&apos;ll send your receipt and confirmation.</p>
+
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (guardianReady) setStep("pickup");
+              }}
+              className="grid gap-4"
+            >
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className={labelClass}>First Name *</label>
+                  <input required className={inputClass} value={guardian.first_name} onChange={(e) => setGuardian({ ...guardian, first_name: e.target.value })} />
+                </div>
+                <div>
+                  <label className={labelClass}>Last Name *</label>
+                  <input required className={inputClass} value={guardian.last_name} onChange={(e) => setGuardian({ ...guardian, last_name: e.target.value })} />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className={labelClass}>Email *</label>
+                  <input required type="email" className={inputClass} value={guardian.email} onChange={(e) => setGuardian({ ...guardian, email: e.target.value })} />
+                </div>
+                <div>
+                  <label className={labelClass}>Phone *</label>
+                  <input required type="tel" className={inputClass} value={guardian.phone} onChange={(e) => setGuardian({ ...guardian, phone: e.target.value })} />
+                </div>
+              </div>
+              <div>
+                <label className={labelClass}>Address</label>
+                <input className={inputClass} placeholder="Street address" value={guardian.address_line1} onChange={(e) => setGuardian({ ...guardian, address_line1: e.target.value })} />
+              </div>
+              <div className="grid grid-cols-3 gap-4">
+                <div>
+                  <label className={labelClass}>City</label>
+                  <input className={inputClass} value={guardian.city} onChange={(e) => setGuardian({ ...guardian, city: e.target.value })} />
+                </div>
+                <div>
+                  <label className={labelClass}>State</label>
+                  <input className={inputClass} value={guardian.state} onChange={(e) => setGuardian({ ...guardian, state: e.target.value })} />
+                </div>
+                <div>
+                  <label className={labelClass}>ZIP</label>
+                  <input className={inputClass} value={guardian.zip} onChange={(e) => setGuardian({ ...guardian, zip: e.target.value })} />
+                </div>
+              </div>
+              <button
+                type="submit"
+                disabled={!guardianReady}
+                className="mt-4 w-full bg-[var(--color-primary)] hover:bg-[var(--color-primary-light)] text-white font-bold text-lg py-4 rounded-full transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+              >
+                Continue to Emergency Contacts
+              </button>
+            </form>
+          </motion.div>
+        )}
+
+        {/* ═══════ SCREEN 4: PICKUP / EMERGENCY ═══════ */}
+        {step === "pickup" && (
+          <motion.div
+            key="pickup"
+            initial={{ opacity: 0, x: 30 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -30 }}
+            transition={{ duration: 0.3 }}
+            className="max-w-2xl mx-auto px-6 pb-16 w-full"
+          >
+            <button onClick={() => setStep("guardian")} className="text-sm text-[var(--color-primary)] mb-4 hover:underline">
+              &larr; Back
+            </button>
+            <h1 className="text-3xl font-bold text-[var(--color-primary)] mb-2">
+              Authorized Pickup &amp; Emergency Contacts
+            </h1>
+            <p className="text-gray-500 mb-4">
+              Adults (other than yourself) authorized to pick up your child. These also serve as emergency contacts.
             </p>
 
-            <div className="bg-white border border-gray-200 rounded-xl p-6 mb-6">
+            {numKids > 1 && (
+              <label className="flex items-center gap-3 mb-6 cursor-pointer bg-white border border-gray-200 rounded-xl p-4">
+                <input
+                  type="checkbox"
+                  checked={sameContactForAll}
+                  onChange={(e) => setSameContactForAll(e.target.checked)}
+                  className="w-5 h-5 accent-[var(--color-accent)]"
+                />
+                <div>
+                  <span className="font-medium text-gray-900">Same emergency contacts for all campers</span>
+                  <p className="text-gray-400 text-sm">
+                    {sameContactForAll
+                      ? `Applies to ${campers.map((c) => c.firstName).filter(Boolean).join(", ") || `all ${numKids} campers`}`
+                      : "You'll assign contacts to specific campers below"}
+                  </p>
+                </div>
+              </label>
+            )}
+
+            {pickups.map((pickup, i) => (
+              <div key={i} className="bg-white border border-gray-200 rounded-xl p-6 mb-4">
+                {!sameContactForAll && numKids > 1 && (
+                  <div className="mb-5 pb-5 border-b border-gray-200">
+                    <label className={labelClass}>This authorized contact is for the following campers:</label>
+                    <div className="flex flex-wrap gap-2">
+                      {campers.map((c, ci) => {
+                        const selected = pickup.camperIndexes.includes(ci);
+                        return (
+                          <button
+                            key={ci}
+                            type="button"
+                            onClick={() => togglePickupCamper(i, ci)}
+                            className={`text-sm px-3 py-1 rounded-full border transition-colors ${
+                              selected
+                                ? "bg-[var(--color-primary)] text-white border-[var(--color-primary)]"
+                                : "bg-white text-gray-400 border-gray-300 hover:border-gray-400"
+                            }`}
+                          >
+                            {c.firstName || `Camper ${ci + 1}`}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <p className="text-xs text-gray-400 mt-1">Tap names to select which campers this contact is for</p>
+                  </div>
+                )}
+
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="font-bold text-gray-700">Contact {i + 1}</h3>
+                  {i > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setPickups(pickups.filter((_, idx) => idx !== i))}
+                      className="text-sm text-red-500 hover:underline"
+                    >
+                      Remove
+                    </button>
+                  )}
+                </div>
+                <div className="grid gap-4">
+                  <div>
+                    <label className={labelClass}>Full Name *</label>
+                    <input className={inputClass} placeholder="First and Last Name" value={pickup.name} onChange={(e) => updatePickup(i, "name", e.target.value)} />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className={labelClass}>Phone *</label>
+                      <input type="tel" className={inputClass} value={pickup.phone} onChange={(e) => updatePickup(i, "phone", e.target.value)} />
+                    </div>
+                    <div>
+                      <label className={labelClass}>Relationship *</label>
+                      <input className={inputClass} placeholder="e.g. Grandparent, Aunt" value={pickup.relationship} onChange={(e) => updatePickup(i, "relationship", e.target.value)} />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+
+            {pickups.length < 4 && (
+              <button
+                type="button"
+                onClick={() => setPickups([...pickups, emptyPickup()])}
+                className="text-[var(--color-primary)] font-medium hover:underline mb-6 block"
+              >
+                + Add another contact
+              </button>
+            )}
+
+            {!pickupReady && (
+              <div className="bg-amber-50 border border-amber-300 rounded-lg p-3 mb-4 text-sm text-amber-900 flex items-start gap-2">
+                <span className="text-lg leading-none shrink-0" aria-hidden="true">&#9888;&#65039;</span>
+                <div>
+                  {validPickups.length === 0 ? (
+                    <p>Add at least one contact (name, phone, and relationship required) to continue.</p>
+                  ) : !sameContactForAll && uncoveredCampers.length > 0 ? (
+                    <p>
+                      Still need a contact for:{" "}
+                      <span className="font-semibold">{uncoveredCampers.map((c) => c.firstName || "unnamed").join(", ")}</span>.
+                      Either tap their name on an existing contact above, or add another contact.
+                    </p>
+                  ) : null}
+                </div>
+              </div>
+            )}
+
+            <button
+              type="button"
+              onClick={() => { setCurrentCamperInfo(0); setStep("camperInfo"); }}
+              disabled={!pickupReady}
+              className="mt-4 w-full bg-[var(--color-primary)] hover:bg-[var(--color-primary-light)] text-white font-bold text-lg py-4 rounded-full transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+            >
+              Continue to Camper Info
+            </button>
+          </motion.div>
+        )}
+
+        {/* ═══════ SCREEN 5: CAMPER INFO (age + medical, per kid) ═══════ */}
+        {step === "camperInfo" && campers[currentCamperInfo] && (
+          <motion.div
+            key={`camperInfo-${currentCamperInfo}`}
+            initial={{ opacity: 0, x: 30 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -30 }}
+            transition={{ duration: 0.3 }}
+            className="max-w-2xl mx-auto px-6 pb-16 w-full"
+          >
+            <button
+              onClick={() => {
+                if (currentCamperInfo > 0) setCurrentCamperInfo(currentCamperInfo - 1);
+                else setStep("pickup");
+              }}
+              className="text-sm text-[var(--color-primary)] mb-4 hover:underline"
+            >
+              &larr; Back
+            </button>
+            <h1 className="text-3xl font-bold text-[var(--color-primary)] mb-2">
+              Camper {numKids > 1 ? `${currentCamperInfo + 1} of ${numKids}` : "Information"}
+            </h1>
+            <p className="text-gray-500 mb-6">
+              {campers[currentCamperInfo].firstName} {campers[currentCamperInfo].lastName}
+            </p>
+
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (!campers[currentCamperInfo].age.trim() || !campers[currentCamperInfo].allergies.trim()) return;
+                if (currentCamperInfo < numKids - 1) setCurrentCamperInfo(currentCamperInfo + 1);
+                else setStep("consent");
+              }}
+              className="grid gap-4"
+            >
+              <div>
+                <label className={labelClass}>Age *</label>
+                <input
+                  required
+                  type="number"
+                  min="3"
+                  max="18"
+                  className={inputClass}
+                  value={campers[currentCamperInfo].age}
+                  onChange={(e) => updateCamperField(currentCamperInfo, "age", e.target.value)}
+                />
+              </div>
+              <div>
+                <label className={labelClass}>Food Allergies / Medical Conditions *</label>
+                <textarea
+                  required
+                  className={inputClass}
+                  rows={3}
+                  placeholder="List any food allergies, medical conditions, or medications. Write 'None' if not applicable."
+                  value={campers[currentCamperInfo].allergies}
+                  onChange={(e) => updateCamperField(currentCamperInfo, "allergies", e.target.value)}
+                />
+              </div>
+              <button
+                type="submit"
+                className="mt-4 w-full bg-[var(--color-primary)] hover:bg-[var(--color-primary-light)] text-white font-bold text-lg py-4 rounded-full transition-colors"
+              >
+                {currentCamperInfo < numKids - 1 ? `Next: Camper ${currentCamperInfo + 2}` : "Continue to Waivers"}
+              </button>
+            </form>
+          </motion.div>
+        )}
+
+        {/* ═══════ SCREEN 6: CONSENT ═══════ */}
+        {step === "consent" && (
+          <motion.div
+            key="consent"
+            initial={{ opacity: 0, x: 30 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -30 }}
+            transition={{ duration: 0.3 }}
+            className="max-w-2xl mx-auto px-6 pb-16 w-full"
+          >
+            <button
+              onClick={() => {
+                setCurrentCamperInfo(numKids - 1);
+                setStep("camperInfo");
+              }}
+              className="text-sm text-[var(--color-primary)] mb-4 hover:underline"
+            >
+              &larr; Back
+            </button>
+            <h1 className="text-3xl font-bold text-[var(--color-primary)] mb-6">
+              Consent &amp; Waivers
+            </h1>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (!consentReady) return;
+                setStep("review");
+              }}
+              className="grid gap-6"
+            >
+              <label className="flex items-start gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  className="mt-1 w-5 h-5"
+                  checked={consent.liability_waiver}
+                  onChange={(e) => setConsent({ ...consent, liability_waiver: e.target.checked })}
+                />
+                <span className="text-gray-700">
+                  <strong>Liability Waiver</strong> — I understand that participation in camp activities involves inherent risks. I release Bower Hill Community Church and its volunteers from liability for any injury or illness that may occur during camp.
+                </span>
+              </label>
+              <label className="flex items-start gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  className="mt-1 w-5 h-5"
+                  checked={consent.photo_release}
+                  onChange={(e) => setConsent({ ...consent, photo_release: e.target.checked })}
+                />
+                <span className="text-gray-700">
+                  <strong>Photo/Video Release</strong> — I grant permission for photos and videos of my child to be used in church communications and social media.
+                </span>
+              </label>
+              <div>
+                <label className={labelClass}>Digital Signature (Full Name) *</label>
+                <input
+                  required
+                  className={inputClass}
+                  placeholder="Type your full legal name"
+                  value={consent.signed_by}
+                  onChange={(e) => setConsent({ ...consent, signed_by: e.target.value })}
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={!consentReady}
+                className="w-full bg-[var(--color-primary)] hover:bg-[var(--color-primary-light)] text-white font-bold text-lg py-4 rounded-full transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+              >
+                Continue to Review
+              </button>
+            </form>
+          </motion.div>
+        )}
+
+        {/* ═══════ SCREEN 7: REVIEW ═══════ */}
+        {step === "review" && (
+          <motion.div
+            key="review"
+            initial={{ opacity: 0, x: 30 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -30 }}
+            transition={{ duration: 0.3 }}
+            className="max-w-2xl mx-auto px-6 pb-16 w-full"
+          >
+            <button onClick={() => setStep("consent")} className="text-sm text-[var(--color-primary)] mb-4 hover:underline">
+              &larr; Back
+            </button>
+            <h1 className="text-3xl font-bold text-[var(--color-primary)] mb-2">
+              Review &amp; Pay
+            </h1>
+            <p className="text-gray-500 mb-6">
+              Please review everything below. Hit the button at the bottom to pay and finish.
+            </p>
+
+            {/* Parent */}
+            <div className="bg-white border border-gray-200 rounded-xl p-5 mb-4">
+              <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-2">Parent</h2>
+              <div className="text-gray-900 font-medium">{guardian.first_name} {guardian.last_name}</div>
+              <div className="text-gray-600 text-sm">{guardian.email}</div>
+              <div className="text-gray-600 text-sm">{guardian.phone}</div>
+              {guardian.address_line1 && (
+                <div className="text-gray-600 text-sm mt-1">
+                  {guardian.address_line1}{guardian.city ? `, ${guardian.city}` : ""}{guardian.state ? `, ${guardian.state}` : ""} {guardian.zip}
+                </div>
+              )}
+            </div>
+
+            {/* Campers */}
+            <div className="bg-white border border-gray-200 rounded-xl p-5 mb-4">
+              <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Campers</h2>
               {campers.map((c, i) => (
-                <div key={i} className="mb-4 last:mb-0">
+                <div key={i} className="mb-3 last:mb-0 pb-3 last:pb-0 border-b last:border-b-0 border-gray-100">
                   <div className="flex justify-between mb-1">
                     <span className="font-bold text-gray-900">{c.firstName} {c.lastName}</span>
                     <span className="font-medium">${(c.priceCents / 100).toFixed(0)}</span>
                   </div>
-                  <div className="flex flex-wrap items-center gap-2 mb-1">
-                    <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
+                  <div className="flex flex-wrap items-center gap-2 text-xs">
+                    <span className={`font-bold px-2 py-0.5 rounded-full ${
                       c.campType?.name === "Day Camp" ? "bg-orange-100 text-orange-700" : "bg-green-100 text-green-700"
                     }`}>
                       {c.campType?.name}
                     </span>
                     {c.grade === "6th and up" && (
-                      <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">
-                        Helper
-                      </span>
+                      <span className="font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">Helper</span>
                     )}
-                    <span className="text-gray-400 text-xs">Grade: {c.grade}</span>
-                    <span className="text-gray-400 text-xs">&bull; {getSchedule(c.campType!.name, c.afternoonOptOut)}</span>
+                    {c.firstYear === true && (
+                      <span className="font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">1st Year — Free</span>
+                    )}
+                    <span className="text-gray-400">Grade: {c.grade}</span>
+                    <span className="text-gray-400">&bull; Age: {c.age}</span>
+                    <span className="text-gray-400">&bull; {getSchedule(c.campType!.name, c.afternoonOptOut)}</span>
                   </div>
-                  {i < campers.length - 1 && <hr className="mt-3" />}
+                  {c.allergies && c.allergies.toLowerCase() !== "none" && (
+                    <div className="text-gray-500 text-xs mt-1">Allergies/Medical: {c.allergies}</div>
+                  )}
                 </div>
               ))}
-              <hr className="my-4" />
-              <div className="flex justify-between text-lg font-bold">
-                <span>Total</span>
-                <span>${(totalCents / 100).toFixed(0)}</span>
+            </div>
+
+            {/* Pickups */}
+            <div className="bg-white border border-gray-200 rounded-xl p-5 mb-4">
+              <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Authorized Pickup / Emergency Contacts</h2>
+              <ul className="text-sm text-gray-700 space-y-1">
+                {validPickups.map((p, i) => (
+                  <li key={i}>
+                    <span className="font-medium">{p.name}</span>
+                    <span className="text-gray-500"> — {p.relationship} — {p.phone}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {/* Consent */}
+            <div className="bg-white border border-gray-200 rounded-xl p-5 mb-6">
+              <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-2">Waivers</h2>
+              <div className="text-sm text-gray-700">
+                <div>Liability: {consent.liability_waiver ? "Accepted" : "Not accepted"}</div>
+                <div>Photo/Video: {consent.photo_release ? "Accepted" : "Not accepted"}</div>
+                <div>Signed by: <span className="font-medium">{consent.signed_by}</span></div>
               </div>
             </div>
 
-            <button
-              onClick={() => setStep("payment")}
-              className="w-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-white font-bold text-lg py-4 rounded-full transition-colors"
-            >
-              Continue to Payment
-            </button>
-            <p className="text-center text-gray-400 text-sm mt-4">
-              Secure payment via Stripe. Emergency info collected after.
-            </p>
+            {/* Total */}
+            <div className="bg-white border border-gray-200 rounded-xl p-5 mb-6 flex justify-between text-lg font-bold">
+              <span>Total</span>
+              <span>${(totalCents / 100).toFixed(0)}</span>
+            </div>
+
+            {totalCents === 0 ? (
+              <button
+                onClick={() => handleCheckout("", "free")}
+                className="w-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-white font-bold text-lg py-4 rounded-full transition-colors"
+              >
+                Complete Registration — Free
+              </button>
+            ) : (
+              <button
+                onClick={() => setStep("payment")}
+                className="w-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-white font-bold text-lg py-4 rounded-full transition-colors"
+              >
+                Continue to Payment
+              </button>
+            )}
           </motion.div>
         )}
 
-        {/* ═══════ SCREEN 4: PAYMENT ═══════ */}
+        {/* ═══════ SCREEN 8: PAYMENT ═══════ */}
         {step === "payment" && (
           <motion.div
             key="payment"
@@ -577,7 +1165,7 @@ export default function RegisterPage() {
             transition={{ duration: 0.3 }}
             className="max-w-2xl mx-auto px-6 pb-16 w-full"
           >
-            <button onClick={() => setStep("checkout")} className="text-sm text-[var(--color-primary)] mb-4 hover:underline">
+            <button onClick={() => setStep("review")} className="text-sm text-[var(--color-primary)] mb-4 hover:underline">
               &larr; Back
             </button>
             <h1 className="text-3xl font-bold text-[var(--color-primary)] mb-2">
@@ -586,7 +1174,11 @@ export default function RegisterPage() {
             <p className="text-gray-500 mb-6">
               Total: <span className="font-bold text-gray-900">${(totalCents / 100).toFixed(0)}</span>
             </p>
-            <PaymentStep amountCents={totalCents} onSuccess={handleCheckout} />
+            <PaymentStep
+              amountCents={totalCents}
+              guardian={guardian}
+              onSuccess={handleCheckout}
+            />
           </motion.div>
         )}
 
@@ -605,18 +1197,10 @@ export default function RegisterPage() {
                 Registration Complete!
               </h1>
               <p className="text-gray-500 mb-4">
-                You&apos;ll receive an email with a printable schedule for each camper.
+                A confirmation email with your receipt and all the details is on its way to {guardian.email}.
               </p>
-              <div className="bg-amber-50 border border-amber-300 rounded-xl p-4 text-left text-amber-900 text-sm flex items-start gap-3">
-                <span className="text-2xl leading-none shrink-0" aria-hidden="true">&#9888;&#65039;</span>
-                <div>
-                  <p className="font-bold mb-1">Remember — we still need your emergency contact information.</p>
-                  <p>Please continue adding that information by clicking the continue button below.</p>
-                </div>
-              </div>
             </div>
 
-            {/* Per-kid schedule cards */}
             <div className="grid gap-4 mb-8">
               {campers.map((c, i) => (
                 <div key={i} className="bg-white border border-gray-200 rounded-xl p-5">
@@ -645,11 +1229,16 @@ export default function RegisterPage() {
             </div>
 
             <a
-              href={`/register/info?registration_id=${registrationId}&num_kids=${campers.length}`}
+              href="/"
               className="block w-full text-center bg-[var(--color-primary)] hover:bg-[var(--color-primary-light)] text-white font-bold text-lg py-4 rounded-full transition-colors"
             >
-              Continue — Provide Contact &amp; Emergency Info
+              Back to Home
             </a>
+            {registrationId && (
+              <p className="text-center text-gray-300 text-xs mt-4 font-mono">
+                Ref: {registrationId.slice(0, 8)}
+              </p>
+            )}
           </motion.div>
         )}
       </AnimatePresence>
@@ -661,10 +1250,12 @@ export default function RegisterPage() {
 
 function PaymentStep({
   amountCents,
+  guardian,
   onSuccess,
 }: {
   amountCents: number;
-  onSuccess: (paymentIntentId: string, status: string, email: string) => void;
+  guardian: Guardian;
+  onSuccess: (paymentIntentId: string, status: string) => void;
 }) {
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -701,36 +1292,33 @@ function PaymentStep({
   }
   return (
     <Elements stripe={stripePromise} options={{ clientSecret, appearance: { theme: "stripe" } }}>
-      <PaymentForm onSuccess={onSuccess} />
+      <PaymentForm guardian={guardian} onSuccess={onSuccess} />
     </Elements>
   );
 }
 
-function PaymentForm({ onSuccess }: { onSuccess: (paymentIntentId: string, status: string, email: string) => void }) {
+function PaymentForm({
+  guardian,
+  onSuccess,
+}: {
+  guardian: Guardian;
+  onSuccess: (paymentIntentId: string, status: string) => void;
+}) {
   const stripe = useStripe();
   const elements = useElements();
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [email, setEmail] = useState("");
-  const [name, setName] = useState("");
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!stripe || !elements) return;
-    if (!email.trim()) {
-      setError("Please enter an email address.");
-      return;
-    }
-    if (!name.trim()) {
-      setError("Please enter the name on the card.");
-      return;
-    }
     setSubmitting(true);
     setError(null);
+    const fullName = `${guardian.first_name} ${guardian.last_name}`.trim();
     const { error: stripeError, paymentIntent } = await stripe.confirmPayment({
       elements,
       confirmParams: {
-        payment_method_data: { billing_details: { email, name: name.trim() } },
+        payment_method_data: { billing_details: { email: guardian.email, name: fullName } },
       },
       redirect: "if_required",
     });
@@ -740,7 +1328,7 @@ function PaymentForm({ onSuccess }: { onSuccess: (paymentIntentId: string, statu
       return;
     }
     if (paymentIntent?.status === "succeeded") {
-      onSuccess(paymentIntent.id, paymentIntent.status, email);
+      onSuccess(paymentIntent.id, paymentIntent.status);
       return;
     }
     setError(`Unexpected payment status: ${paymentIntent?.status ?? "unknown"}`);
@@ -749,23 +1337,6 @@ function PaymentForm({ onSuccess }: { onSuccess: (paymentIntentId: string, statu
 
   return (
     <form onSubmit={handleSubmit} className="grid gap-4">
-      <div className="bg-white border border-gray-200 rounded-xl p-5 grid gap-3">
-        <LinkAuthenticationElement
-          onChange={(e) => setEmail(e.value.email)}
-        />
-        <div>
-          <label className="block text-xs font-medium text-gray-600 mb-1">Name</label>
-          <input
-            type="text"
-            autoComplete="cc-name"
-            placeholder="Full name"
-            className="w-full border border-gray-300 rounded-md px-3 py-2.5 text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)] focus:border-transparent"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            required
-          />
-        </div>
-      </div>
       <div className="bg-white border border-gray-200 rounded-xl p-5">
         <PaymentElement
           options={{

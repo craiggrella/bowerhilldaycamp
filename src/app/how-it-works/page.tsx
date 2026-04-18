@@ -8,7 +8,7 @@ const steps = [
     emoji: "🏕️",
     title: "Choose Your Camp",
     description:
-      "Day Camp (full day of adventure) or Jr Day Camp (half day for the little ones). Both are packed with fun! Tell us how many campers you're registering and complete your payment securely. Easy peasy.",
+      "Day Camp (full day of adventure) or Jr Day Camp (half day for the little ones). Both are packed with fun! Tell us how many campers you're registering and complete your payment securely. Easy peasy. First-year registrants that have completed third grade and under can attend for FREE.",
   },
   {
     number: "2",
