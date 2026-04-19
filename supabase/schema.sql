@@ -82,6 +82,10 @@ create table emergency_contacts (
 );
 
 -- Medical info (one per camper)
+-- NOTE: the `campers` table above also gets a `pairing_notes text` column
+-- via supabase/migration-pairing-notes.sql — update this schema file if
+-- you ever rebuild from scratch.
+
 create table medical_info (
   id uuid primary key default gen_random_uuid(),
   camper_id uuid references campers(id) on delete cascade,

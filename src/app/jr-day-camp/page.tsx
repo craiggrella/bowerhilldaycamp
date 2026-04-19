@@ -17,12 +17,12 @@ export default function JrDayCampPage() {
             Jr Day Camp
           </h1>
           <p className="text-white/80 text-lg mb-8">
-            A gentle half-day for our youngest campers — preschool through 2nd grade.
+            A half-day of fun for our youngest campers – preschool (potty-trained) through 2nd grade. First time attending? Try it out for free!
           </p>
           <div className="grid sm:grid-cols-3 gap-4">
             <div className="bg-white rounded-xl p-5 text-center">
               <div className="text-xs uppercase tracking-wide text-gray-400 mb-1">Grades</div>
-              <div className="font-bold text-gray-900">PreK – 2nd</div>
+              <div className="font-bold text-gray-900">PreK to 2nd grade</div>
             </div>
             <div className="bg-white rounded-xl p-5 text-center">
               <div className="text-xs uppercase tracking-wide text-gray-400 mb-1">Hours</div>
@@ -54,25 +54,11 @@ export default function JrDayCampPage() {
         {/* Description */}
         <div className="space-y-6 max-w-none mb-10 text-gray-700 leading-relaxed">
           <p>
-            Jr Day Camp is a perfect first taste of camp — half-day, low-key, and
-            packed with the things little kids love: crafts, songs, simple games,
-            and snack time with new friends.
-          </p>
-          <p>
-            Our staff gives the youngest campers extra attention and keeps the pace
-            comfortable. Drop-off and pickup happen at the same place, and the
-            morning ends in time for lunch at home.
-          </p>
-        </div>
-
-        {/* Potty trained note */}
-        <div className="bg-amber-50 border border-amber-200 rounded-xl p-5 mb-10">
-          <h2 className="font-bold text-amber-900 mb-2">A quick note for parents</h2>
-          <p className="text-amber-900 text-sm leading-relaxed">
-            Jr Day Campers need to be fully potty trained. Our staff isn&apos;t able
-            to assist with diaper changes or bathroom accidents, so please make sure
-            your camper is comfortable using the bathroom independently before
-            registering.
+            Jr Day Camp is a perfect first taste of camp, where your child will
+            experience music, games, crafts, snack, spending time both indoors and
+            outside. Our staff gives the youngest campers extra attention and keeps
+            the pace comfortable. Invite a new friend to join you at camp;
+            first-time campers can attend for free!
           </p>
         </div>
 

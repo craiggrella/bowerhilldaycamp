@@ -5,10 +5,10 @@ const steps = [
   {
     number: "1",
     color: "#FF6B35",
-    emoji: "🏕️",
+    emoji: "🧭",
     title: "Choose Your Camp",
     description:
-      "Day Camp (full day of adventure) or Jr Day Camp (half day for the little ones). Both are packed with fun! Tell us how many campers you're registering and complete your payment securely. Easy peasy. First-year registrants that have completed third grade and under can attend for FREE.",
+      "There are two different tracks, based on the child\u2019s completed grade. Jr. Day Camp, for preK (potty-trained) through 2nd grade runs daily from 9:30 a.m. until noon. Day Camp, for 3rd-5th grade, runs daily from 9:30 a.m. \u2013 3 p.m. Both are packed with fun! Older youth in grades 6th and up register as Day Camp helpers and will be assigned to one of the above tracks. Tell us how many campers you're registering and complete your payment securely. Easy peasy.",
   },
   {
     number: "2",
@@ -16,7 +16,7 @@ const steps = [
     emoji: "🕒",
     title: "Flexible Options",
     description:
-      "We know life gets busy, kids have sports and other commitments, and parents with Jr Day and Day Campers might not want to make multiple trips for pickup. That's why Day Campers can choose to opt out of the afternoon session (12–3pm) and wrap up at the same time as Jr Day Camp.",
+      "We know life is busy and kids may have other commitments. Day Campers can choose to opt out of the afternoon session (12\u20133pm) and wrap up at the same time as Jr Day Camp.",
   },
   {
     number: "3",
@@ -24,7 +24,7 @@ const steps = [
     emoji: "📋",
     title: "Contact & Emergency Info",
     description:
-      "Fill out the important stuff — parent info, emergency contacts, medical details, and waivers. We keep your kids safe!",
+      "You\u2019ll also be asked to complete the important stuff - parent info, emergency contacts, and allergy information all on line. We value keeping your kids safe!",
   },
   {
     number: "4",
@@ -32,7 +32,7 @@ const steps = [
     emoji: "📬",
     title: "Check Your Inbox",
     description:
-      "You'll get 2 receipts — one for your payment, and one with all the details: where to go, when to drop off, and a recap of all the info you submitted.",
+      "You'll get 1 confirmation email with all the info you need \u2014 a payment receipt and all the camp details: where to go, when to drop off, and a recap of all the camper info you submitted.",
   },
 ];
 
@@ -41,7 +41,7 @@ export default function HowItWorksPage() {
     <div className="min-h-screen bg-gray-50">
       <Header />
 
-      <div className="max-w-3xl mx-auto px-6 py-16">
+      <div className="max-w-3xl mx-auto px-6 pt-16 pb-56">
         <h1 className="text-4xl md:text-5xl font-bold text-center text-[var(--color-primary)] mb-4">
           How It Works
         </h1>
@@ -89,7 +89,7 @@ export default function HowItWorksPage() {
         <div className="text-center mt-16">
           <Link
             href="/register"
-            className="inline-block bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-white font-bold text-xl px-12 py-5 rounded-full transition-colors shadow-lg"
+            className="inline-block bg-[#DC2626] hover:bg-[#B91C1C] text-white font-bold text-xl px-12 py-5 rounded-full transition-colors shadow-lg"
           >
             Let&apos;s Go — Register Now
           </Link>

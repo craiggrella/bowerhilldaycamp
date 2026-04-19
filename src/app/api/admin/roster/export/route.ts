@@ -9,6 +9,7 @@ type Camper = {
   grade: string | null;
   afternoon_opt_out: boolean;
   first_year: boolean;
+  pairing_notes: string | null;
   registration_id: string;
   camp_types: { name: string } | { name: string }[] | null;
 };
@@ -63,7 +64,7 @@ export async function GET() {
 
   const campersRes = await supabaseAdmin
     .from("campers")
-    .select("id, first_name, last_name, grade, afternoon_opt_out, first_year, registration_id, camp_types(name)")
+    .select("id, first_name, last_name, grade, afternoon_opt_out, first_year, pairing_notes, registration_id, camp_types(name)")
     .order("last_name")
     .order("first_name");
 
@@ -128,6 +129,7 @@ export async function GET() {
     "Guardian Email",
     "Emergency Contacts",
     "Medical / Allergies",
+    "Pairing Notes",
   ];
 
   const rows = campers.map((c) => {
@@ -141,7 +143,7 @@ export async function GET() {
       .join("; ");
 
     const medical = [med?.allergies, med?.notes].filter(Boolean).join("; ");
-    const campLabel = c.grade === "6th and up" ? `${campName || ""} — Helper` : (campName || "");
+    const campLabel = c.grade === "6th and up" ? `${campName || ""} — Volunteer` : (campName || "");
 
     return [
       c.first_name || "",
@@ -155,6 +157,7 @@ export async function GET() {
       g?.email || "",
       contactsStr,
       medical,
+      c.pairing_notes || "",
     ];
   });
 

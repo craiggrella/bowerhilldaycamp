@@ -8,7 +8,7 @@ export async function GET() {
 
   const campersRes = await supabaseAdmin
     .from("campers")
-    .select("id, first_name, last_name, grade, afternoon_opt_out, first_year, registration_id, camp_types(name)")
+    .select("id, first_name, last_name, grade, afternoon_opt_out, first_year, pairing_notes, registration_id, camp_types(name)")
     .order("last_name")
     .order("first_name");
 

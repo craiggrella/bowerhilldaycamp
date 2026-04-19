@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import Header from "@/components/Header";
 import { motion, AnimatePresence } from "framer-motion";
 import { loadStripe } from "@stripe/stripe-js";
@@ -27,6 +28,7 @@ type CamperEntry = {
   grade: string;
   age: string;
   allergies: string;
+  pairingNotes: string;
   campType: CampType | null;
   priceCents: number;
   afternoonOptOut: boolean;
@@ -72,7 +74,7 @@ type Step =
 
 const GRADE_OPTIONS = ["Preschool", "K", "1st", "2nd", "3rd", "4th", "5th", "6th and up"];
 const JR_GRADES = new Set(["Preschool", "K", "1st", "2nd"]);
-const FIRST_YEAR_ELIGIBLE_GRADES = new Set(["Preschool", "K", "1st", "2nd", "3rd"]);
+const FIRST_YEAR_ELIGIBLE_GRADES = new Set(["Preschool", "K", "1st", "2nd"]);
 const HELPER_GRADE = "6th and up";
 
 function isFirstYearEligibleGrade(grade: string): boolean {
@@ -80,7 +82,7 @@ function isFirstYearEligibleGrade(grade: string): boolean {
 }
 
 function emptyCamper(): CamperEntry {
-  return { firstName: "", lastName: "", grade: "", age: "", allergies: "", campType: null, priceCents: 0, afternoonOptOut: false, firstYear: null };
+  return { firstName: "", lastName: "", grade: "", age: "", allergies: "", pairingNotes: "", campType: null, priceCents: 0, afternoonOptOut: false, firstYear: null };
 }
 
 function emptyGuardian(): Guardian {
@@ -97,7 +99,7 @@ function emptyConsent(): Consent {
 
 function getPriceCents(grade: string, firstYear: boolean | null): number {
   if (!grade) return 0;
-  // First-year registrants in eligible grades (3rd and under) attend for free.
+  // First-year registrants in eligible grades (2nd and under) attend for free.
   if (firstYear === true && isFirstYearEligibleGrade(grade)) return 0;
   if (JR_GRADES.has(grade)) return 2500;
   if (grade === HELPER_GRADE) return 2500;
@@ -138,7 +140,18 @@ const ZIP_RE = /^\d{5}$/;
 // ─── Component ───────────────────────────────────────────
 
 export default function RegisterPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-gray-50" />}>
+      <RegisterPageInner />
+    </Suspense>
+  );
+}
+
+function RegisterPageInner() {
+  const searchParams = useSearchParams();
+  const isAdmin = searchParams?.get("admin") === "1";
   const [step, setStep] = useState<Step>("count");
+  const [paymentReceived, setPaymentReceived] = useState<boolean | null>(null);
   const [campTypes, setCampTypes] = useState<CampType[]>([]);
   const [numCampers, setNumCampers] = useState(1);
   const [campers, setCampers] = useState<CamperEntry[]>([]);
@@ -314,6 +327,7 @@ export default function RegisterPage() {
             grade: c.grade,
             age: c.age,
             allergies: c.allergies,
+            pairingNotes: c.pairingNotes,
             afternoonOptOut: c.afternoonOptOut,
             firstYear: c.firstYear === true,
             priceCents: c.priceCents,
@@ -322,6 +336,7 @@ export default function RegisterPage() {
           pickups: pickups.filter((p) => p.name.trim()),
           sameContactForAll,
           consent,
+          ...(isAdmin ? { manualEntry: true, paymentReceived: paymentReceived === true } : {}),
         }),
       });
       const data = await res.json();
@@ -407,7 +422,14 @@ export default function RegisterPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
-      <Header rightText="Registration" />
+      <Header rightText={isAdmin ? "Admin Entry" : "Registration"} />
+
+      {isAdmin && (
+        <div className="bg-purple-50 border-b border-purple-200 text-purple-900 text-sm px-6 py-2 text-center">
+          <span className="font-semibold">Admin manual entry mode</span> — guardian will not receive an email automatically.
+          {" "}<Link href="/admin" className="underline font-semibold">Back to admin</Link>
+        </div>
+      )}
 
       {showProgress && (
         <div className="max-w-2xl mx-auto px-6 pt-8 w-full">
@@ -511,51 +533,47 @@ export default function RegisterPage() {
 
             <div className="grid gap-6 lg:grid-cols-[1fr_320px] items-start">
 
-            <aside className="lg:col-start-2 lg:row-start-1 lg:sticky lg:top-6 bg-white border border-gray-200 rounded-xl p-5 text-sm">
-              <h2 className="font-bold text-[var(--color-primary)] text-lg mb-5">About the camps</h2>
-
-              <div className="mb-6">
+            <aside className="lg:col-start-2 lg:row-start-1 lg:sticky lg:top-6 flex flex-col gap-4 text-sm">
+              <div className="bg-white border border-gray-200 rounded-xl p-5">
                 <div className="flex items-center gap-2 mb-2">
                   <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-green-100 text-green-700">Jr Day Camp</span>
                   <span className="font-bold text-gray-900">$25</span>
                 </div>
                 <p className="text-gray-500 text-xs mb-2">9:30 AM – 12:00 PM</p>
-                <p className="text-gray-600">A gentle half-day of crafts, games, songs, and snack for our youngest campers.</p>
-                <p className="text-gray-400 text-xs mt-2"><span className="font-medium text-gray-500">Grades:</span> Preschool, K, 1st, 2nd</p>
+                <p className="text-gray-600">
+                  A half-day of music, crafts, games, stories and snack for our youngest campers. First time attending? Little ones can come for free!
+                </p>
+                <p className="text-gray-400 text-xs mt-2"><span className="font-medium text-gray-500">Completed Grades:</span> Preschool – 2nd</p>
               </div>
 
-              <div className="mb-6">
+              <div className="bg-white border border-gray-200 rounded-xl p-5">
                 <div className="flex items-center gap-2 mb-2">
                   <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-orange-100 text-orange-700">Day Camp</span>
                   <span className="font-bold text-gray-900">$75</span>
                 </div>
                 <p className="text-gray-500 text-xs mb-2">9:30 AM – 3:00 PM</p>
-                <p className="text-gray-600">A full day of camp — morning activities, lunch, plus afternoon programming.</p>
-                <p className="text-gray-400 text-xs mt-2"><span className="font-medium text-gray-500">Grades:</span> 3rd, 4th, 5th</p>
-              </div>
-
-              <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-6">
-                <p className="font-semibold text-amber-900 text-xs mb-2">Morning only option</p>
-                <p className="text-amber-900 text-xs leading-snug">
-                  We know life gets busy, kids have sports and other commitments, and parents with Jr Day and Day Campers might not want to make multiple trips for pickup. That&apos;s why Day Campers can choose to opt out of the afternoon session (12–3pm) and wrap up at the same time as Jr Day Camp. Even though they&apos;re ending early, the price remains the same as normal Day Camp price because we order crafts/supplies for them to complete during the time they are with us.
+                <p className="text-gray-600">
+                  Big kids love to help! Full-day campers will participate in a service-learning track. During the morning, kids will learn about and complete a tactile mission project for local non-profit organizations. Kids bring-their-own lunch, and then spend the afternoon doing structured games, crafts and activities just for them. Cost includes snacks and supplies for the daily mission projects. If your child only plans to stay for the morning, you can opt out of the afternoon session.
                 </p>
+                <p className="text-gray-400 text-xs mt-2"><span className="font-medium text-gray-500">Completed Grades:</span> 3rd – 5th</p>
               </div>
 
-              <div className="mb-6">
+              <div className="bg-white border border-gray-200 rounded-xl p-5">
                 <div className="flex items-center gap-2 mb-2">
-                  <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-orange-100 text-orange-700">Day Camp</span>
-                  <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">Helper</span>
+                  <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">Older Youth Volunteer</span>
                   <span className="font-bold text-gray-900">$25</span>
                 </div>
                 <p className="text-gray-500 text-xs mb-2">9:30 AM – 3:00 PM</p>
-                <p className="text-gray-600">Helper rate for campers who&apos;ve completed 6th grade or higher.</p>
-                <p className="text-gray-400 text-xs mt-2"><span className="font-medium text-gray-500">Grades:</span> 6th and up</p>
+                <p className="text-gray-600">
+                  Older youth register as volunteers. Youth will be assigned to help in the morning with one of the camp tracks and spend the afternoon doing structured games, crafts and activities.
+                </p>
+                <p className="text-gray-400 text-xs mt-2"><span className="font-medium text-gray-500">Completed grades:</span> 6th – 12th</p>
               </div>
 
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                <p className="font-semibold text-blue-900 text-xs mb-2">6th grade and up — helpers</p>
-                <p className="text-blue-900 text-xs leading-snug">
-                  Kids who&apos;ve finished 6th grade or beyond join as helpers, supporting our staff in a leadership role with our younger campers. That&apos;s why we offer a special helper rate of $25 per camper at 6th grade and up.
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-5">
+                <p className="font-semibold text-amber-900 text-xs mb-2">Registration notes</p>
+                <p className="text-amber-900 text-xs leading-snug">
+                  The Free Camp is only offered for the youngest group, which is PreK–completed 2nd.
                 </p>
               </div>
             </aside>
@@ -629,7 +647,7 @@ export default function RegisterPage() {
                         </span>
                         {camper.grade === "6th and up" && (
                           <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 ml-1">
-                            Helper
+                            Volunteer
                           </span>
                         )}
                         <span className="text-gray-400 text-sm ml-2">
@@ -673,29 +691,31 @@ export default function RegisterPage() {
                         Is this their first year at Bower Hill Day Camp?
                       </p>
                       <p className="text-xs text-emerald-800 mb-3">
-                        First-year campers in 3rd grade and under attend for <strong>FREE</strong>.
+                        First-year campers in 2nd grade and under attend for <strong>FREE</strong>.
                       </p>
                       <div className="flex gap-2">
                         <button
                           type="button"
                           onClick={() => setFirstYear(i, true)}
-                          className={`text-sm font-semibold px-4 py-1.5 rounded-full border transition-colors ${
+                          className={`inline-flex items-center gap-1.5 text-sm font-semibold px-4 py-1.5 rounded-full border transition-colors ${
                             camper.firstYear === true
                               ? "bg-emerald-600 text-white border-emerald-600"
                               : "bg-white text-emerald-700 border-emerald-300 hover:border-emerald-500"
                           }`}
                         >
+                          {camper.firstYear === true && <span aria-hidden>✓</span>}
                           Yes — first year
                         </button>
                         <button
                           type="button"
                           onClick={() => setFirstYear(i, false)}
-                          className={`text-sm font-semibold px-4 py-1.5 rounded-full border transition-colors ${
+                          className={`inline-flex items-center gap-1.5 text-sm font-semibold px-4 py-1.5 rounded-full border transition-colors ${
                             camper.firstYear === false
                               ? "bg-emerald-600 text-white border-emerald-600"
                               : "bg-white text-emerald-700 border-emerald-300 hover:border-emerald-500"
                           }`}
                         >
+                          {camper.firstYear === false && <span aria-hidden>✓</span>}
                           No — returning
                         </button>
                       </div>
@@ -1102,9 +1122,19 @@ export default function RegisterPage() {
                   required
                   className={inputClass}
                   rows={3}
-                  placeholder="List any food allergies, medical conditions, or medications. Write 'None' if not applicable."
+                  placeholder="List any food allergies, medical conditions, or medications if they will be bringing them to camp."
                   value={campers[currentCamperInfo].allergies}
                   onChange={(e) => updateCamperField(currentCamperInfo, "allergies", e.target.value)}
+                />
+              </div>
+              <div>
+                <label className={labelClass}>Friends and Sibling Pairing Info</label>
+                <textarea
+                  className={inputClass}
+                  rows={3}
+                  placeholder="We know kids are happiest when they are grouped with buddies. Let us know if your camper has a friend to pair with or if siblings should be together or separated; this will help us assign groups."
+                  value={campers[currentCamperInfo].pairingNotes}
+                  onChange={(e) => updateCamperField(currentCamperInfo, "pairingNotes", e.target.value)}
                 />
               </div>
               <button
@@ -1242,7 +1272,7 @@ export default function RegisterPage() {
                       {c.campType?.name}
                     </span>
                     {c.grade === "6th and up" && (
-                      <span className="font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">Helper</span>
+                      <span className="font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">Volunteer</span>
                     )}
                     {c.firstYear === true && (
                       <span className="font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">1st Year — Free</span>
@@ -1251,8 +1281,15 @@ export default function RegisterPage() {
                     <span className="text-gray-400">&bull; Age: {c.age}</span>
                     <span className="text-gray-400">&bull; {getSchedule(c.campType!.name, c.afternoonOptOut)}</span>
                   </div>
-                  {c.allergies && c.allergies.toLowerCase() !== "none" && (
-                    <div className="text-gray-500 text-xs mt-1">Allergies/Medical: {c.allergies}</div>
+                  {c.allergies && (
+                    <div className="text-gray-500 text-xs mt-1">
+                      <span className="font-medium text-gray-600">Allergies / Medical:</span> {c.allergies}
+                    </div>
+                  )}
+                  {c.pairingNotes && (
+                    <div className="text-gray-500 text-xs mt-1">
+                      <span className="font-medium text-gray-600">Friends / Sibling Pairing:</span> {c.pairingNotes}
+                    </div>
                   )}
                 </div>
               ))}
@@ -1287,7 +1324,44 @@ export default function RegisterPage() {
               <span>${(totalCents / 100).toFixed(0)}</span>
             </div>
 
-            {totalCents === 0 ? (
+            {isAdmin ? (
+              <div className="bg-white border border-gray-200 rounded-xl p-5 mb-4">
+                <p className="text-sm font-semibold text-gray-700 mb-3">Payment status</p>
+                <div className="flex flex-wrap gap-2 mb-4">
+                  <button
+                    type="button"
+                    onClick={() => setPaymentReceived(true)}
+                    className={`inline-flex items-center gap-1.5 text-sm font-semibold px-4 py-2 rounded-full border transition-colors ${
+                      paymentReceived === true
+                        ? "bg-emerald-600 text-white border-emerald-600"
+                        : "bg-white text-emerald-700 border-emerald-300 hover:border-emerald-500"
+                    }`}
+                  >
+                    {paymentReceived === true && <span aria-hidden>✓</span>}
+                    Payment received
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPaymentReceived(false)}
+                    className={`inline-flex items-center gap-1.5 text-sm font-semibold px-4 py-2 rounded-full border transition-colors ${
+                      paymentReceived === false
+                        ? "bg-amber-600 text-white border-amber-600"
+                        : "bg-white text-amber-700 border-amber-300 hover:border-amber-500"
+                    }`}
+                  >
+                    {paymentReceived === false && <span aria-hidden>✓</span>}
+                    Payment pending
+                  </button>
+                </div>
+                <button
+                  disabled={paymentReceived === null}
+                  onClick={() => handleCheckout("", "manual")}
+                  className="w-full bg-[var(--color-primary)] hover:bg-[var(--color-primary-light)] disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold text-lg py-4 rounded-full transition-colors"
+                >
+                  Save Registration (Admin)
+                </button>
+              </div>
+            ) : totalCents === 0 ? (
               <button
                 onClick={() => handleCheckout("", "free")}
                 className="w-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-white font-bold text-lg py-4 rounded-full transition-colors"
@@ -1363,7 +1437,7 @@ export default function RegisterPage() {
                     </span>
                     {c.grade === "6th and up" && (
                       <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">
-                        Helper
+                        Volunteer
                       </span>
                     )}
                   </div>

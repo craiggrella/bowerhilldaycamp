@@ -142,7 +142,7 @@ function campBadge(campName: string): string {
 }
 
 function helperBadge(): string {
-  return `<span style="border:1px solid #1d4ed8;color:#1d4ed8;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;padding:2px 6px;border-radius:3px;margin-left:4px">Helper</span>`;
+  return `<span style="border:1px solid #1d4ed8;color:#1d4ed8;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;padding:2px 6px;border-radius:3px;margin-left:4px">Volunteer</span>`;
 }
 
 function firstYearBadge(): string {

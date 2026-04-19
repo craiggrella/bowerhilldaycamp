@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { sendConfirmationEmail, notifyAdmin } from "@/lib/email";
+import { requireAdmin } from "@/lib/require-admin";
 
 type CamperPayload = {
   campTypeId: string | null;
@@ -9,6 +10,7 @@ type CamperPayload = {
   grade: string;
   age: string;
   allergies: string;
+  pairingNotes: string;
   afternoonOptOut: boolean;
   firstYear: boolean;
   priceCents: number;
@@ -47,6 +49,10 @@ type Body = {
   pickups: PickupPayload[];
   sameContactForAll: boolean;
   consent: ConsentPayload;
+  // Admin-only: marks the row as manually entered, and carries whether the
+  // admin has already collected cash/check payment.
+  manualEntry?: boolean;
+  paymentReceived?: boolean;
 };
 
 export async function POST(req: NextRequest) {
@@ -55,13 +61,22 @@ export async function POST(req: NextRequest) {
   if (!Array.isArray(body.campers) || body.campers.length === 0) {
     return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
   }
-  // Paid registrations must have a Stripe id; free registrations (all-first-year) may not.
-  if (body.amountCents > 0 && !body.stripePaymentId) {
+
+  const isManual = body.manualEntry === true;
+
+  // Manual entries require admin auth. Refuse otherwise so the flag can't
+  // be spoofed by an anonymous caller to skip payment.
+  if (isManual) {
+    const unauthorized = await requireAdmin();
+    if (unauthorized) return unauthorized;
+  } else if (body.amountCents > 0 && !body.stripePaymentId) {
+    // Paid registrations via the guardian flow must have a Stripe id;
+    // free registrations (all-first-year) may not.
     return NextResponse.json({ error: "Missing payment id for paid registration" }, { status: 400 });
   }
 
-  // Idempotency: if this payment intent already produced a registration, return it. (paid only)
-  if (body.stripePaymentId) {
+  // Idempotency: if this payment intent already produced a registration, return it. (paid Stripe only)
+  if (!isManual && body.stripePaymentId) {
     const { data: existing } = await supabaseAdmin
       .from("registrations")
       .select("id")
@@ -72,14 +87,19 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  // Status: Stripe-paid and admin-received-cash both use "paid". Admin
+  // entries where payment hasn't been received yet use "pending".
+  const regStatus = isManual ? (body.paymentReceived ? "paid" : "pending") : "paid";
+
   // 1) Registration row
   const { data: reg, error: regError } = await supabaseAdmin
     .from("registrations")
     .insert({
       amount_cents: body.amountCents,
-      status: "paid",
-      stripe_payment_id: body.stripePaymentId,
-      stripe_payment_status: body.stripeStatus,
+      status: regStatus,
+      stripe_payment_id: isManual ? null : body.stripePaymentId,
+      stripe_payment_status: isManual ? (body.paymentReceived ? "manual_paid" : "manual_pending") : body.stripeStatus,
+      manual_entry: isManual,
     })
     .select()
     .single();
@@ -108,6 +128,7 @@ export async function POST(req: NextRequest) {
         age: c.age,
         afternoon_opt_out: c.afternoonOptOut,
         first_year: c.firstYear,
+        pairing_notes: c.pairingNotes || null,
       })
       .select()
       .single();
@@ -224,9 +245,13 @@ export async function POST(req: NextRequest) {
   const { data: allCampTypes } = await supabaseAdmin.from("camp_types").select("id, name");
   const campNameById = new Map<string, string>((allCampTypes ?? []).map((ct) => [ct.id as string, ct.name as string]));
 
-  // 8) Send ONE combined confirmation + receipt email to the guardian.
+  // 8) Send the confirmation email. Manual admin entries skip auto-send —
+  // the admin triggers email delivery via the dashboard "resend" icon.
   let emailSent = false;
   let emailError: unknown = null;
+  if (isManual) {
+    return NextResponse.json({ registrationId: reg.id });
+  }
   try {
     emailSent = await sendConfirmationEmail({
       to: body.guardian.email,

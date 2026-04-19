@@ -54,15 +54,13 @@ export default function DayCampPage() {
         {/* Description */}
         <div className="space-y-6 max-w-none mb-10 text-gray-700 leading-relaxed">
           <p>
-            Day Camp is the full Bower Hill experience — morning activities, lunch
-            with friends, and an afternoon of programming. Kids spend the day moving
-            between hands-on projects, outdoor games, music, and quiet group time
-            with our staff.
-          </p>
-          <p>
-            We keep groups small enough that every kid gets attention, and big enough
-            that there&apos;s always someone to laugh with. Snack and lunch are
-            included.
+            Kids love to help, so we’ve lined up an all-new experience - a
+            service-learning track. During the morning, kids will learn about and
+            complete mission projects for local non-profit organizations. Kids
+            bring-their-own lunch, and then spend the afternoon doing structured
+            games, crafts and activities just for them. Cost includes snacks and
+            supplies for the daily mission projects. If your child only plans to
+            stay for the morning, you can opt out of the afternoon session.
           </p>
         </div>
 
@@ -70,22 +68,20 @@ export default function DayCampPage() {
         <div className="bg-amber-50 border border-amber-200 rounded-xl p-5 mb-6">
           <h2 className="font-bold text-amber-900 mb-2">Morning only option</h2>
           <p className="text-amber-900 text-sm leading-relaxed">
-            We know life gets busy — kids have sports and other commitments, and
-            parents juggling Jr Day and Day Campers might not want to make multiple
-            pickup trips. That&apos;s why Day Campers can choose to opt out of the
-            afternoon session (12–3pm) and wrap up at the same time as Jr Day Camp.
-            Even though they&apos;re ending early, the price stays the same — we
-            order crafts and supplies for them either way.
+            We know life is busy and kids may have other commitments. Day Campers
+            can choose to opt out of the afternoon session (12–3pm), but the cost
+            remains the same to cover supplies for the daily mission projects.
           </p>
         </div>
 
-        {/* Helper callout */}
+        {/* Youth Volunteer callout */}
         <div className="bg-blue-50 border border-blue-200 rounded-xl p-5 mb-10">
-          <h2 className="font-bold text-blue-900 mb-2">6th grade and up — Helpers</h2>
+          <h2 className="font-bold text-blue-900 mb-2">6th grade and up - Youth Volunteer</h2>
           <p className="text-blue-900 text-sm leading-relaxed">
-            Kids who&apos;ve completed 6th grade or higher join us as helpers,
-            supporting our staff in a leadership role with the younger campers.
-            Helper rate is <strong>$25</strong>.
+            Kids who&apos;ve completed 6th grade or higher register as volunteers.
+            Youth will be assigned to help in the morning with one of the camp
+            tracks and spend the afternoon doing structured games, crafts and
+            activities. Volunteers receive a discount for their help.
           </p>
         </div>
 
