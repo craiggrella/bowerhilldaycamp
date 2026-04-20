@@ -265,7 +265,7 @@ export async function sendConfirmationEmail(data: ConfirmationData): Promise<boo
     <div style="font-size:14px;color:#000;line-height:1.5;margin-bottom:24px">
       Bower Hill Community Church<br>
       70 Moffett St, Pittsburgh, PA 15243<br>
-      <em>Monday July 27th to Friday July 31, 2026 — drop-off from 9:15 AM.</em>
+      <em>Monday July 27th to Friday July 31, 2026 — drop-off at 9:30 AM.</em>
     </div>
 
     <h2 style="font-size:13px;font-weight:700;margin:0 0 6px;color:#000;text-transform:uppercase;letter-spacing:0.04em">Parent / Guardian</h2>
