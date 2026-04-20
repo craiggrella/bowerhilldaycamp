@@ -76,7 +76,6 @@ async function sendTransactional({ to, subject, html }: { to: string; subject: s
     console.error("Email API error:", res.status, res.body);
     return false;
   }
-  console.log(`Email sent to ${to}: "${subject}"`);
   return true;
 }
 
