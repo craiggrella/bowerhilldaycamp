@@ -43,7 +43,7 @@ export default function DayCampPage() {
           style={{ border: "10px solid #FFB800" }}
         >
           <Image
-            src="/images/BHCC Day Camp 00011.png"
+            src="/images/BHCC Day Camp 00012.png"
             alt="Day Camp kids in action"
             fill
             sizes="(min-width: 768px) 768px, 100vw"
