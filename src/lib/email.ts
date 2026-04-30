@@ -152,6 +152,38 @@ function firstYearBadge(): string {
 
 // Sends a plain-text-ish HTML alert to the site admin. Fire-and-await at the
 // error site; own try/catch so a failing alert never cascades.
+export async function sendAdminInvite(opts: {
+  to: string;
+  inviterEmail: string;
+  actionLink: string;
+}): Promise<boolean> {
+  const subject = "You're invited to the Bower Hill Day Camp admin dashboard";
+  const inner = `
+    <p style="font-size:15px;margin:0 0 12px">Hi,</p>
+    <p style="font-size:15px;line-height:1.55;margin:0 0 16px">
+      <strong>${escapeHtml(opts.inviterEmail)}</strong> invited you to access the
+      Bower Hill Day Camp admin dashboard.
+    </p>
+    <p style="font-size:15px;line-height:1.55;margin:0 0 20px">
+      Click the button below to set your password and finish creating your account.
+    </p>
+    <p style="text-align:center;margin:0 0 24px">
+      <a href="${opts.actionLink}"
+         style="display:inline-block;background:#3b2562;color:#fff;font-weight:700;padding:12px 28px;border-radius:999px;text-decoration:none;font-size:15px">
+        Set my password
+      </a>
+    </p>
+    <p style="font-size:13px;color:#555;line-height:1.5;margin:0">
+      If the button doesn't work, copy and paste this link into your browser:<br>
+      <span style="color:#1e3a8a;word-break:break-all">${escapeHtml(opts.actionLink)}</span>
+    </p>
+    <p style="font-size:13px;color:#888;line-height:1.5;margin:16px 0 0">
+      Didn't expect this? You can ignore this email.
+    </p>
+  `;
+  return sendTransactional({ to: opts.to, subject, html: shell(inner) });
+}
+
 export async function notifyAdmin(subject: string, details: Record<string, unknown>): Promise<void> {
   const adminEmail = process.env.ADMIN_ALERT_EMAIL || "craig@craiggrella.com";
   const lines = Object.entries(details).map(([k, v]) => {

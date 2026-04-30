@@ -358,6 +358,12 @@ export default function AdminPage() {
             >
               Print Roster
             </button>
+            <Link
+              href="/admin/users"
+              className="bg-white border border-gray-300 text-gray-600 font-medium text-sm px-4 py-2 rounded-lg hover:bg-gray-100 transition-colors"
+            >
+              Manage admins
+            </Link>
             <button
               onClick={handleSignOut}
               className="bg-white border border-gray-300 text-gray-600 font-medium text-sm px-4 py-2 rounded-lg hover:bg-gray-100 transition-colors"
