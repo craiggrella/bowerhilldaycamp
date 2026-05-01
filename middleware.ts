@@ -30,14 +30,14 @@ export async function middleware(request: NextRequest) {
 
   // Protect /admin routes. Two public-without-session exceptions:
   //  - /admin/login (always public)
-  //  - /admin/set-password ONLY when the URL has a ?code=... PKCE auth
-  //    code from a fresh Supabase invite/recovery link. Direct visits
-  //    without a code (random URL guessers) get bounced to login.
+  //  - /admin/set-password — invitees land here with the recovery token
+  //    in the URL hash (not visible server-side), so middleware can't
+  //    pre-check it. The page itself enforces auth via supabase.auth
+  //    .getSession(): no valid session = "invite expired" message and
+  //    no form. So a random URL visitor cannot actually set a password.
   const path = request.nextUrl.pathname;
-  const hasAuthCode = request.nextUrl.searchParams.has("code");
   const isPublicAdmin =
-    path === "/admin/login" ||
-    (path === "/admin/set-password" && hasAuthCode);
+    path === "/admin/login" || path === "/admin/set-password";
   const isAdminRoute = path.startsWith("/admin") && !isPublicAdmin;
   if (isAdminRoute && !user) {
     const loginUrl = request.nextUrl.clone();
