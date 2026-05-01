@@ -110,6 +110,12 @@ export default function ManageAdminsPage() {
             </Link>
             <h1 className="text-2xl font-bold text-[var(--color-primary)] mt-1">Manage admins</h1>
           </div>
+          <Link
+            href="/admin/profile"
+            className="bg-white border border-gray-300 text-gray-600 font-medium text-sm px-4 py-2 rounded-lg hover:bg-gray-100 transition-colors"
+          >
+            My Account
+          </Link>
         </div>
 
         {/* Invite form (owner only) */}

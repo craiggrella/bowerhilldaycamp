@@ -28,9 +28,17 @@ export async function middleware(request: NextRequest) {
   // Refresh session on every request so cookies stay fresh.
   const { data: { user } } = await supabase.auth.getUser();
 
-  // Protect /admin routes (except the login page itself).
+  // Protect /admin routes. Two public-without-session exceptions:
+  //  - /admin/login (always public)
+  //  - /admin/set-password ONLY when the URL has a ?code=... PKCE auth
+  //    code from a fresh Supabase invite/recovery link. Direct visits
+  //    without a code (random URL guessers) get bounced to login.
   const path = request.nextUrl.pathname;
-  const isAdminRoute = path.startsWith("/admin") && path !== "/admin/login";
+  const hasAuthCode = request.nextUrl.searchParams.has("code");
+  const isPublicAdmin =
+    path === "/admin/login" ||
+    (path === "/admin/set-password" && hasAuthCode);
+  const isAdminRoute = path.startsWith("/admin") && !isPublicAdmin;
   if (isAdminRoute && !user) {
     const loginUrl = request.nextUrl.clone();
     loginUrl.pathname = "/admin/login";
