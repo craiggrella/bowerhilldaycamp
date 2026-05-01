@@ -24,13 +24,56 @@ function SetPasswordInner() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Supabase auto-consumes the recovery token from the URL hash on init.
-    // Wait a tick, then check for an active session.
-    const timer = setTimeout(async () => {
-      const { data } = await supabase.auth.getSession();
-      setHasSession(!!data.session);
-    }, 200);
-    return () => clearTimeout(timer);
+    let cancelled = false;
+
+    async function init() {
+      // 1. If a session already exists (e.g., they navigated back here while
+      //    signed in), nothing to do.
+      const { data: existing } = await supabase.auth.getSession();
+      if (existing.session) {
+        if (!cancelled) setHasSession(true);
+        return;
+      }
+
+      // 2. PKCE flow: ?code=... in the query string.
+      const url = new URL(window.location.href);
+      const code = url.searchParams.get("code");
+      if (code) {
+        const { error } = await supabase.auth.exchangeCodeForSession(code);
+        if (!error && !cancelled) {
+          window.history.replaceState({}, "", url.pathname);
+          setHasSession(true);
+          return;
+        }
+      }
+
+      // 3. Implicit/recovery flow: tokens in the URL hash. This is what
+      //    Supabase's invite/recovery links actually deliver.
+      const hash = window.location.hash;
+      if (hash && hash.length > 1) {
+        const params = new URLSearchParams(hash.slice(1));
+        const access_token = params.get("access_token");
+        const refresh_token = params.get("refresh_token");
+        if (access_token && refresh_token) {
+          const { error } = await supabase.auth.setSession({
+            access_token,
+            refresh_token,
+          });
+          if (!error && !cancelled) {
+            window.history.replaceState({}, "", url.pathname);
+            setHasSession(true);
+            return;
+          }
+        }
+      }
+
+      if (!cancelled) setHasSession(false);
+    }
+
+    init();
+    return () => {
+      cancelled = true;
+    };
   }, [supabase]);
 
   async function handleSubmit(e: React.FormEvent) {
