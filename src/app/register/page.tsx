@@ -152,6 +152,7 @@ function RegisterPageInner() {
   const isAdmin = searchParams?.get("admin") === "1";
   const [step, setStep] = useState<Step>("count");
   const [paymentReceived, setPaymentReceived] = useState<boolean | null>(null);
+  const [checkoutSubmitting, setCheckoutSubmitting] = useState(false);
   const [campTypes, setCampTypes] = useState<CampType[]>([]);
   const [numCampers, setNumCampers] = useState(1);
   const [campers, setCampers] = useState<CamperEntry[]>([]);
@@ -312,6 +313,10 @@ function RegisterPageInner() {
   // ─── Submission after payment succeeds ───────────────
 
   async function handleCheckout(stripePaymentId: string, stripeStatus: string) {
+    // Idempotency guard: rapid repeat clicks of "Complete Registration — Free"
+    // or the admin Save button must not create duplicate rows.
+    if (checkoutSubmitting) return;
+    setCheckoutSubmitting(true);
     try {
       const res = await fetch("/api/registrations", {
         method: "POST",
@@ -359,6 +364,8 @@ function RegisterPageInner() {
           stripePaymentId
       );
       console.error(e);
+    } finally {
+      setCheckoutSubmitting(false);
     }
   }
 
@@ -1354,19 +1361,20 @@ function RegisterPageInner() {
                   </button>
                 </div>
                 <button
-                  disabled={paymentReceived === null}
+                  disabled={paymentReceived === null || checkoutSubmitting}
                   onClick={() => handleCheckout("", "manual")}
                   className="w-full bg-[var(--color-primary)] hover:bg-[var(--color-primary-light)] disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold text-lg py-4 rounded-full transition-colors"
                 >
-                  Save Registration (Admin)
+                  {checkoutSubmitting ? "Saving…" : "Save Registration (Admin)"}
                 </button>
               </div>
             ) : totalCents === 0 ? (
               <button
+                disabled={checkoutSubmitting}
                 onClick={() => handleCheckout("", "free")}
-                className="w-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-white font-bold text-lg py-4 rounded-full transition-colors"
+                className="w-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold text-lg py-4 rounded-full transition-colors"
               >
-                Complete Registration — Free
+                {checkoutSubmitting ? "Completing…" : "Complete Registration — Free"}
               </button>
             ) : (
               <button

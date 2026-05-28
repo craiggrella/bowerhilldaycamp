@@ -87,6 +87,47 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  // Idempotency for $0 (free) registrations from the guardian flow:
+  // they have no Stripe id, so the check above doesn't catch them.
+  // If the same guardian email already created a free registration with
+  // the identical camper-name set in the last 5 minutes, return that
+  // existing row instead of inserting a duplicate. This prevents the
+  // "user mashed the Complete button 30 times" failure mode.
+  if (!isManual && body.amountCents === 0 && body.guardian?.email) {
+    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+    const { data: recentGuardians } = await supabaseAdmin
+      .from("guardians")
+      .select("registration_id, registrations!inner(id, status, amount_cents, created_at)")
+      .eq("email", body.guardian.email)
+      .eq("registrations.amount_cents", 0)
+      .gte("registrations.created_at", fiveMinutesAgo);
+
+    if (recentGuardians && recentGuardians.length > 0) {
+      const recentRegIds = recentGuardians.map((g) => g.registration_id);
+      const { data: recentCampers } = await supabaseAdmin
+        .from("campers")
+        .select("registration_id, first_name, last_name")
+        .in("registration_id", recentRegIds);
+      const incomingKey = body.campers
+        .map((c) => `${c.firstName.trim()} ${c.lastName.trim()}`.trim())
+        .sort()
+        .join("|");
+      const byReg = new Map<string, string[]>();
+      for (const c of recentCampers ?? []) {
+        if (!byReg.has(c.registration_id)) byReg.set(c.registration_id, []);
+        byReg
+          .get(c.registration_id)!
+          .push(`${(c.first_name ?? "").trim()} ${(c.last_name ?? "").trim()}`.trim());
+      }
+      for (const regId of recentRegIds) {
+        const existingKey = (byReg.get(regId) ?? []).slice().sort().join("|");
+        if (existingKey === incomingKey) {
+          return NextResponse.json({ registrationId: regId });
+        }
+      }
+    }
+  }
+
   // Status: Stripe-paid and admin-received-cash both use "paid". Admin
   // entries where payment hasn't been received yet use "pending".
   const regStatus = isManual ? (body.paymentReceived ? "paid" : "pending") : "paid";
