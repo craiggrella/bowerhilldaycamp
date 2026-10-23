@@ -54,6 +54,21 @@ async function postJSON(
 
 // ─── Transport ───────────────────────────────────────────
 
+// The mail server rewrites every double-quoted <a href="..."> into a
+// links.campaignplanner.org tracking redirect (single-quoted hrefs pass
+// through), and wraps the message in a second <html><body> unless the <body>
+// tag is bare. So: move <body> attributes onto an inner div, and single-quote
+// hrefs (a ' inside the URL becomes %27).
+function prepareForEsp(html: string): string {
+  return html
+    .replace(/<body\b([^>]*)>([\s\S]*?)<\/body>/i, (match, attrs: string, inner: string) =>
+      attrs.trim() ? `<body>\n<div${attrs}>${inner}</div>\n</body>` : match
+    )
+    .replace(/(<a\s[^>]*?\bhref\s*=\s*)"([^"]*)"/gi, (_m, pre: string, url: string) =>
+      `${pre}'${url.replace(/'/g, "%27")}'`
+    );
+}
+
 async function sendTransactional({ to, subject, html }: { to: string; subject: string; html: string }): Promise<boolean> {
   const apiKey = process.env.EMAIL_API_KEY;
   if (!apiKey) {
@@ -68,7 +83,7 @@ async function sendTransactional({ to, subject, html }: { to: string; subject: s
     fromemail: fromEmail,
     to,
     subject,
-    body: html,
+    body: prepareForEsp(html),
   });
 
   const res = await postJSON(EMAIL_API_URL, { "X-Auth-APIKey": apiKey }, payload);
