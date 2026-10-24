@@ -35,7 +35,14 @@ export async function middleware(request: NextRequest) {
   //    pre-check it. The page itself enforces auth via supabase.auth
   //    .getSession(): no valid session = "invite expired" message and
   //    no form. So a random URL visitor cannot actually set a password.
-  const path = request.nextUrl.pathname;
+  // Decode first: the router resolves /%61dmin to /admin, so the check must
+  // see the same path or encoded URLs skip the redirect.
+  let path = request.nextUrl.pathname;
+  try {
+    path = decodeURIComponent(path);
+  } catch {
+    // Malformed encoding: keep the raw path.
+  }
   const isPublicAdmin =
     path === "/admin/login" || path === "/admin/set-password";
   const isAdminRoute = path.startsWith("/admin") && !isPublicAdmin;
